@@ -2092,9 +2092,9 @@ if ($poItemsQuery) {
                         </thead>
                         <tbody>
                             <?php 
-                            // Get orders for the Orders tab
+                            // Get orders for the Orders tab (both Orders and Purchase Order)
                             $orderFilter = isset($_GET['filter']) && in_array($_GET['filter'], ['all', 'with_po', 'no_po', 'delivered']) ? $_GET['filter'] : 'all';
-                            $orderWhere = "company_name = 'Orders'";
+                            $orderWhere = "(company_name = 'Orders' OR company_name = 'Purchase Order')";
                             
                             if ($orderFilter === 'with_po') {
                                 $orderWhere .= " AND ((po_number IS NOT NULL AND po_number != '') OR po_status IN ('Pending', 'Received'))";
@@ -2186,7 +2186,7 @@ if ($poItemsQuery) {
                                         <?php if ($referenceNo !== ''): ?>
                                             <?php echo htmlspecialchars($referenceNo); ?>
                                         <?php else: ?>
-                                            <span style="color: #ffcc80; font-weight: 600;">Pending</span>
+                                            <span style="color: #999;">—</span>
                                         <?php endif; ?>
                                     </td>
                                     <td style="text-align: center;">
@@ -2199,13 +2199,19 @@ if ($poItemsQuery) {
                                                 echo 'background: #e74c3c; color: #fff;';
                                             }
                                         ?>">
-                                            <?php echo htmlspecialchars($order['po_status'] ?: 'No PO'); ?>
+                                            <?php 
+                                                $displayStatus = $order['po_status'] ?: 'No PO';
+                                                if ($displayStatus === 'Pending') {
+                                                    $displayStatus = 'Incoming Order';
+                                                }
+                                                echo htmlspecialchars($displayStatus);
+                                            ?>
                                         </span>
                                     </td>
                                     <td style="text-align: center; white-space: nowrap;">
                                         <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
-                                            <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #60a8ff; background: rgba(96, 168, 255, 0.14); transition: all 0.2s ease; cursor: pointer;" href="order-details.php?id=<?php echo intval($order['id']); ?>" onclick="event.stopPropagation();"><i class="fas fa-eye"></i> View</a>
-                                            <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #f3be4d; background: rgba(243, 190, 77, 0.14); transition: all 0.2s ease; cursor: pointer;" href="order-details.php?id=<?php echo intval($order['id']); ?>" onclick="event.stopPropagation();"><i class="fas fa-pen"></i> Edit</a>
+                                            <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #60a8ff; background: rgba(96, 168, 255, 0.14); transition: all 0.2s ease; cursor: pointer;" href="po-details.php?id=<?php echo intval($order['id']); ?>&mode=view" onclick="event.stopPropagation();"><i class="fas fa-eye"></i> View</a>
+                                            <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #f3be4d; background: rgba(243, 190, 77, 0.14); transition: all 0.2s ease; cursor: pointer;" href="po-details.php?id=<?php echo intval($order['id']); ?>&mode=edit" onclick="event.stopPropagation();"><i class="fas fa-pen"></i> Edit</a>
                                         </div>
                                     </td>
                                 </tr>
@@ -2241,7 +2247,7 @@ if ($poItemsQuery) {
                         <label for="po_status">PO Status</label>
                         <select id="po_status" name="po_status">
                             <option>No PO</option>
-                            <option>Pending</option>
+                            <option>Incoming Order</option>
                             <option>Received</option>
                         </select>
                     </div>
@@ -2780,12 +2786,28 @@ if ($poItemsQuery) {
             document.getElementById('inventoryUploadStatus').innerHTML = '';
         }
 
-        function clearAllInventory() {
-            if (!confirm('⚠️ WARNING!\n\nThis will DELETE ALL inventory data.\n\nThis action CANNOT be undone.\n\nAre you sure you want to continue?')) {
+        async function clearAllInventory() {
+            let firstConfirm = false;
+            if (typeof window.showStyledConfirm === 'function') {
+                const result = await window.showStyledConfirm('This will DELETE ALL inventory data. This action CANNOT be undone. Are you sure you want to continue?', 'Warning');
+                firstConfirm = !!(result && result.confirmed);
+            } else {
+                firstConfirm = confirm('⚠️ WARNING!\n\nThis will DELETE ALL inventory data.\n\nThis action CANNOT be undone.\n\nAre you sure you want to continue?');
+            }
+
+            if (!firstConfirm) {
                 return;
             }
 
-            if (!confirm('Please confirm again that you want to permanently delete all inventory data.')) {
+            let secondConfirm = false;
+            if (typeof window.showStyledConfirm === 'function') {
+                const result = await window.showStyledConfirm('Please confirm again that you want to permanently delete all inventory data.', 'Final Confirmation');
+                secondConfirm = !!(result && result.confirmed);
+            } else {
+                secondConfirm = confirm('Please confirm again that you want to permanently delete all inventory data.');
+            }
+
+            if (!secondConfirm) {
                 return;
             }
 
@@ -3316,6 +3338,11 @@ if ($poItemsQuery) {
             if (container) {
                 container.innerHTML = orderDetailsHTML;
             }
+        }
+
+        // Edit Item Details - Shows editable modal
+        function editItemDetails(itemCode, itemName, currentStock) {
+            openEditStockModal(itemCode, itemName, currentStock);
         }
 
         // Open Edit Stock Modal
@@ -4082,11 +4109,23 @@ if ($poItemsQuery) {
         }
 
         function viewOrderDetails(orderId) {
-            alert('Order details for ID: ' + orderId + '\n\nFull details view coming soon!');
+            if (typeof window.showStyledAlert === 'function') {
+                window.showStyledAlert('Order details for ID: ' + orderId + '\n\nFull details view coming soon!', 'Order Details');
+            } else {
+                alert('Order details for ID: ' + orderId + '\n\nFull details view coming soon!');
+            }
         }
 
-        function confirmDeleteOrder(orderId, itemCode) {
-            if (confirm(`Are you sure you want to delete the order for item ${itemCode}?`)) {
+        async function confirmDeleteOrder(orderId, itemCode) {
+            let confirmed = false;
+            if (typeof window.showStyledConfirm === 'function') {
+                const result = await window.showStyledConfirm(`Are you sure you want to delete the order for item ${itemCode}?`, 'Delete Order');
+                confirmed = !!(result && result.confirmed);
+            } else {
+                confirmed = confirm(`Are you sure you want to delete the order for item ${itemCode}?`);
+            }
+
+            if (confirmed) {
                 deleteOrder(orderId);
             }
         }
@@ -4285,10 +4324,7 @@ if ($poItemsQuery) {
             if (matchedProduct) {
                 codeInput.value = matchedProduct.code;
                 nameInput.value = matchedProduct.name;
-                return;
             }
-
-            codeInput.setCustomValidity('Select a valid Product Code from the list.');
         }
 
         function syncProductFromNameInput(nameInput) {
@@ -4309,10 +4345,7 @@ if ($poItemsQuery) {
             if (matchedProduct) {
                 nameInput.value = matchedProduct.name;
                 codeInput.value = matchedProduct.code;
-                return;
             }
-
-            nameInput.setCustomValidity('Select a valid Product Name from the list.');
         }
 
         function validateProductRows() {
@@ -4335,28 +4368,16 @@ if ($poItemsQuery) {
                     return;
                 }
 
-                const matchedByCode = productsByCode.get(normalizedCode) || findMatchedOption(codeInput, 'code');
-                if (!matchedByCode) {
-                    codeInput.setCustomValidity('Select a valid Product Code from the list.');
-                    isValid = false;
-                    return;
+                const matchedByCode = productsByCode.get(normalizedCode);
+                const matchedByName = productsByName.get(normalizedName);
+                
+                // Allow any product code/name combination, even if not from the list
+                if (matchedByCode) {
+                    codeInput.value = matchedByCode.code;
                 }
-
-                const matchedByName = productsByName.get(normalizedName) || findMatchedOption(nameInput, 'name');
-                if (!matchedByName) {
-                    nameInput.setCustomValidity('Select a valid Product Name from the list.');
-                    isValid = false;
-                    return;
+                if (matchedByName) {
+                    nameInput.value = matchedByName.name;
                 }
-
-                if (matchedByCode.name !== matchedByName.name || matchedByCode.code !== matchedByName.code) {
-                    nameInput.setCustomValidity('Product Name must match the selected Product Code.');
-                    isValid = false;
-                    return;
-                }
-
-                codeInput.value = matchedByCode.code;
-                nameInput.value = matchedByCode.name;
             });
 
             return isValid;
@@ -4483,6 +4504,11 @@ if ($poItemsQuery) {
                         createOrderForm.classList.add('was-validated');
                         createOrderForm.reportValidity();
                     } else {
+                        // Convert "Incoming Order" back to "Pending" for database storage
+                        const poStatusSelect = document.getElementById('po_status');
+                        if (poStatusSelect && poStatusSelect.value === 'Incoming Order') {
+                            poStatusSelect.value = 'Pending';
+                        }
                         createOrderForm.submit();
                     }
                 });

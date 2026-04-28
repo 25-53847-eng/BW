@@ -243,7 +243,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delet
         exit;
     }
 
-    $stmt = $conn->prepare("DELETE FROM delivery_records WHERE id = ? AND company_name = 'Orders'");
+    $stmt = $conn->prepare("DELETE FROM delivery_records WHERE id = ? AND company_name IN ('Orders', 'Purchase Order')");
     if ($stmt) {
         $stmt->bind_param('i', $deleteId);
         if ($stmt->execute()) {
@@ -276,7 +276,7 @@ if (!in_array($filter, $allowedFilters, true)) {
     $filter = 'all';
 }
 
-$where = "company_name = 'Orders'";
+$where = "company_name IN ('Orders', 'Purchase Order')";
 if ($filter === 'with_po') {
     $where .= " AND ((po_number IS NOT NULL AND po_number != '') OR po_status IN ('Pending', 'Received'))";
 } elseif ($filter === 'no_po') {

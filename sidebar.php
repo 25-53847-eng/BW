@@ -19,6 +19,7 @@ $menuItems = [
     ['label' => 'Reports', 'href' => 'reports.php', 'icon' => 'fas fa-file-alt', 'pages' => ['reports.php']],
     ['label' => 'Upload Data', 'href' => 'upload-data.php', 'icon' => 'fas fa-upload', 'pages' => ['upload-data.php']],
     ['label' => 'Warranty Items', 'href' => 'warranty-replacements.php', 'icon' => 'fas fa-wrench', 'pages' => ['warranty-replacements.php']],
+    ['label' => 'Select Access', 'href' => 'access.php', 'icon' => 'fas fa-user-shield', 'pages' => ['access.php']],
     ['label' => 'Settings', 'href' => 'settings.php', 'icon' => 'fas fa-cog', 'pages' => ['settings.php', 'profile.php', 'help.php']],
 ];
 

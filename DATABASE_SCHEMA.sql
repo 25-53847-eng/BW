@@ -23,6 +23,14 @@ CREATE TABLE IF NOT EXISTS `delivery_records` (
   `highlight_color` VARCHAR(20) DEFAULT NULL COMMENT 'Imported Excel highlight color',
   `cell_styles` LONGTEXT DEFAULT NULL COMMENT 'Per-cell imported Excel colors as JSON',
   `notes` TEXT COMMENT 'Additional notes or comments about the delivery',
+  `order_customer` VARCHAR(255) DEFAULT NULL COMMENT 'Customer/Client for inquiry orders',
+  `order_date` DATE DEFAULT NULL COMMENT 'Order date for inquiry items',
+  `po_number` VARCHAR(50) DEFAULT NULL COMMENT 'Purchase Order number',
+  `po_status` VARCHAR(50) DEFAULT NULL COMMENT 'PO Status (No PO, Pending, Received)',
+  `unit_price` DECIMAL(15,2) DEFAULT 0 COMMENT 'Unit price for inquiry items',
+  `total_amount` DECIMAL(15,2) DEFAULT 0 COMMENT 'Total amount (quantity * unit_price)',
+  `groupings` VARCHAR(10) DEFAULT NULL COMMENT 'Product groupings (1A, 1B, 2A, 2B, 3A, 4A)',
+  `dataset_name` VARCHAR(255) DEFAULT NULL COMMENT 'Dataset name for categorization',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation timestamp',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record last update timestamp',
   
@@ -33,11 +41,84 @@ CREATE TABLE IF NOT EXISTS `delivery_records` (
   KEY `idx_item_code` (`item_code`),
   KEY `idx_company_name` (`company_name`),
   KEY `idx_status` (`status`),
+  KEY `idx_po_status` (`po_status`),
   KEY `idx_created_at` (`created_at`),
   
   -- Unique constraint to prevent duplicate entries
   UNIQUE KEY `unique_delivery` (`delivery_month`, `delivery_day`, `delivery_year`, `item_code`, `company_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores delivery records for BW Gas Detector products';
+
+-- Logical views for phpMyAdmin visibility by module/category
+CREATE OR REPLACE VIEW `vw_inventory` AS
+SELECT *
+FROM `delivery_records`
+WHERE `company_name` = 'Stock Addition';
+
+CREATE OR REPLACE VIEW `vw_purchase_orders` AS
+SELECT *
+FROM `delivery_records`
+WHERE `company_name` IN ('Orders', 'Purchase Order');
+
+CREATE OR REPLACE VIEW `vw_andison_manila` AS
+SELECT *
+FROM `delivery_records`
+WHERE LOWER(TRIM(COALESCE(`company_name`, ''))) IN ('andison manila', 'to andison manila')
+   OR LOWER(TRIM(COALESCE(`sold_to`, ''))) IN ('andison manila', 'to andison manila');
+
+CREATE OR REPLACE VIEW `vw_sales` AS
+SELECT *
+FROM `delivery_records`
+WHERE `quantity` > 0
+  AND `company_name` NOT IN ('Stock Addition', 'Orders', 'Purchase Order')
+  AND LOWER(TRIM(COALESCE(`company_name`, ''))) NOT IN ('andison manila', 'to andison manila');
+
+CREATE OR REPLACE VIEW `vw_inquiry` AS
+SELECT *
+FROM `delivery_records`
+WHERE `company_name` = 'Inquiry'
+  AND (COALESCE(`po_status`, '') = '' OR `po_status` IN ('No PO', 'Pending'));
+
+CREATE OR REPLACE VIEW `vw_delivery` AS
+SELECT *
+FROM `delivery_records`
+WHERE `company_name` NOT IN ('Orders', 'Purchase Order', 'Inquiry', 'Stock Addition')
+  AND LOWER(TRIM(COALESCE(`company_name`, ''))) NOT IN ('andison manila', 'to andison manila')
+  AND LOWER(TRIM(COALESCE(`sold_to`, ''))) NOT IN ('andison manila', 'to andison manila');
+
+CREATE OR REPLACE VIEW `vw_datasets` AS
+SELECT
+  COALESCE(NULLIF(TRIM(`dataset_name`), ''), 'UNASSIGNED') AS dataset_name,
+  COUNT(*) AS total_records,
+  COALESCE(SUM(`quantity`), 0) AS total_quantity,
+  MIN(`created_at`) AS first_record_at,
+  MAX(`created_at`) AS last_record_at
+FROM `delivery_records`
+GROUP BY COALESCE(NULLIF(TRIM(`dataset_name`), ''), 'UNASSIGNED');
+
+-- Alias views that match module names in phpMyAdmin list
+CREATE OR REPLACE VIEW `inventory` AS
+SELECT * FROM `vw_inventory`;
+
+CREATE OR REPLACE VIEW `purchase_order` AS
+SELECT * FROM `vw_purchase_orders`;
+
+CREATE OR REPLACE VIEW `andison_manila` AS
+SELECT * FROM `vw_andison_manila`;
+
+CREATE OR REPLACE VIEW `sales` AS
+SELECT * FROM `vw_sales`;
+
+CREATE OR REPLACE VIEW `inquiry` AS
+SELECT * FROM `vw_inquiry`;
+
+CREATE OR REPLACE VIEW `delivery` AS
+SELECT * FROM `vw_delivery`;
+
+CREATE OR REPLACE VIEW `datasets` AS
+SELECT * FROM `vw_datasets`;
+
+CREATE OR REPLACE VIEW `warranty` AS
+SELECT * FROM `warranty_replacements`;
 
 -- Insert sample data (optional)
 INSERT INTO delivery_records (delivery_month, delivery_day, item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes)

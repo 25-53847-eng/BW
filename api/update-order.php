@@ -38,8 +38,8 @@ if (empty($status)) {
 }
 
 try {
-    // Get order details
-    $order_sql = "SELECT id, item_code, item_name, quantity, delivery_month, delivery_day, delivery_year FROM delivery_records WHERE id = ? AND company_name = 'Orders'";
+    // Get order details (from either Orders or Purchase Order)
+    $order_sql = "SELECT id, item_code, item_name, quantity, delivery_month, delivery_day, delivery_year, company_name FROM delivery_records WHERE id = ? AND company_name IN ('Orders', 'Purchase Order')";
     $order_stmt = $conn->prepare($order_sql);
     if (!$order_stmt) {
         throw new Exception("Prepare order select failed: " . $conn->error);
@@ -58,6 +58,9 @@ try {
     
     $order = $order_result->fetch_assoc();
     $order_stmt->close();
+    
+    // Remember the original company_name to use in updates/deletes
+    $order_company = $order['company_name'];
 
     // Convert quantity to integer to fix corrupted values from previous bug
     $quantity_int = intval($order['quantity']); 
@@ -105,17 +108,17 @@ try {
             $ins_stmt->close();
         }
         
-        // Delete order from Orders table
-        $del_sql = "DELETE FROM delivery_records WHERE id = ? AND company_name = 'Orders'";
+        // Delete order from its original table (Orders or Purchase Order)
+        $del_sql = "DELETE FROM delivery_records WHERE id = ? AND company_name = ?";
         $del_stmt = $conn->prepare($del_sql);
-        $del_stmt->bind_param("i", $order_id);
+        $del_stmt->bind_param("is", $order_id, $order_company);
         $del_stmt->execute();
         $del_stmt->close();
     } else {
-        // Update status only
-        $upd_sql = "UPDATE delivery_records SET status = ?, updated_at = ? WHERE id = ? AND company_name = 'Orders'";
+        // Update status only (keep in original company table)
+        $upd_sql = "UPDATE delivery_records SET status = ?, updated_at = ? WHERE id = ? AND company_name = ?";
         $upd_stmt = $conn->prepare($upd_sql);
-        $upd_stmt->bind_param("ssi", $status, $now, $order_id);
+        $upd_stmt->bind_param("sssi", $status, $now, $order_id, $order_company);
         if (!$upd_stmt->execute()) {
             throw new Exception("Update status failed: " . $upd_stmt->error);
         }

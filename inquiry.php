@@ -135,11 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     $deliveryYear = intval($dt->format('Y'));
     $deliveryDate = $dt->format('Y-m-d');
     $status = 'Pending';
-    $targetCompany = 'Orders';
-    if ($poStatus === 'Received') {
-        $targetCompany = 'Delivery Records';
-        $status = 'Ready for Delivery';
-    }
+    $targetCompany = 'Inquiry';
     $soldTo = $customer;
     $datasetName = $selectedDataset !== 'all' ? $selectedDataset : '';
     $totalAmount = $quantity * $unitPrice;
@@ -179,12 +175,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         if ($stmt->execute()) {
             $_SESSION['inquiry_flash'] = [
                 'type' => 'success',
-                'message' => $poStatus === 'Received'
-                    ? 'Inquiry created and routed to Delivery Records.'
-                    : 'Inquiry created successfully.'
+                'message' => 'Inquiry created successfully.'
             ];
             $stmt->close();
-            $redirect = ($poStatus === 'Received') ? 'delivery-records.php' : 'inquiry.php';
+            $redirect = 'inquiry.php';
             if ($selectedDataset !== 'all') {
                 $redirect .= '?dataset=' . urlencode($selectedDataset);
             }
@@ -208,7 +202,7 @@ if (!in_array($filter, $allowedFilters, true)) {
     $filter = 'all';
 }
 
-$where = "company_name = 'Orders' AND (po_status IS NULL OR po_status = '' OR po_status = 'No PO' OR po_status = 'Pending')";
+$where = "company_name = 'Inquiry' AND (po_status IS NULL OR po_status = '' OR po_status = 'No PO' OR po_status = 'Pending')";
 if ($filter === 'no_po') {
     $where .= " AND (po_status IS NULL OR po_status = '' OR po_status = 'No PO')";
 } elseif ($filter === 'pending') {
@@ -216,7 +210,7 @@ if ($filter === 'no_po') {
 }
 
 $stats = ['total' => 0, 'no_po' => 0, 'pending' => 0];
-$countResult = $conn->query("SELECT po_status, COUNT(*) as total FROM delivery_records WHERE company_name = 'Orders' GROUP BY po_status");
+$countResult = $conn->query("SELECT po_status, COUNT(*) as total FROM delivery_records WHERE company_name = 'Inquiry' GROUP BY po_status");
 if ($countResult) {
     while ($row = $countResult->fetch_assoc()) {
         $poStatus = trim((string) ($row['po_status'] ?? ''));
@@ -618,7 +612,7 @@ $canAddInquiry = is_inquiry_admin();
                                         <td><?php echo h($inquiry['created_at'] ? date('M d, Y', strtotime($inquiry['created_at'])) : ''); ?></td>
                                         <td>
                                             <div class="row-actions">
-                                                <a class="action-btn secondary" href="order-details.php?id=<?php echo (int) $inquiry['id']; ?>"><i class="fas fa-eye"></i> View</a>
+                                                <a class="action-btn secondary" href="inquiry-details.php?id=<?php echo (int) $inquiry['id']; ?>"><i class="fas fa-eye"></i> View</a>
                                             </div>
                                         </td>
                                     </tr>

@@ -82,6 +82,7 @@ unset($_SESSION['login_attempts'], $_SESSION['login_first_attempt']);
 $_SESSION['user_id']    = $user['id'];
 $_SESSION['user_email'] = $user['email'];
 $_SESSION['user_name']  = $user['name'] ?? $user['email'];
+$_SESSION['user_role']  = 'admin'; // Default to admin role (can be overridden by employee login)
 
 respond([
     'success'  => true,

@@ -573,10 +573,10 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
         }
         .modal-content.modal-large {
             max-width: 750px;
-            max-height: calc(100vh - 40px);
+            max-height: 80vh;
             overflow-y: auto;
             box-sizing: border-box;
-            margin: 20px 0;
+            margin: 100px 0 5px 0;
         }
         .modal-content.modal-large::-webkit-scrollbar { width: 6px; }
         .modal-content.modal-large::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 3px; }
@@ -936,11 +936,30 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="add_quantity">Qty.</label>
-                        <input type="number" id="add_quantity" name="quantity" placeholder="e.g., 40" min="0">
+                        <input type="number" id="add_quantity" name="quantity" placeholder="e.g., 40" min="0" step="0.01" onchange="calculateAddTotal(); calculateTotalRevenue();">
                     </div>
                     <div class="form-group">
                         <label for="add_uom">UOM</label>
                         <input type="text" id="add_uom" name="uom" placeholder="e.g., units, pcs">
+                    </div>
+                    <div class="form-group">
+                        <label for="add_unit_price">Unit Price</label>
+                        <input type="number" id="add_unit_price" name="unit_price" placeholder="e.g., 1500.00" min="0" step="0.01" onchange="calculateAddTotal();">
+                    </div>
+                    <div class="form-group">
+                        <label for="add_total_amount">Total Amount</label>
+                        <input type="number" id="add_total_amount" name="total_amount" placeholder="e.g., 60000.00" min="0" step="0.01" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
+                        <small class="input-hint" style="color: #888; font-size: 10px; margin-top: 2px;">Auto-calculated: Qty × Unit Price</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="add_selling_price">Selling Price</label>
+                        <input type="number" id="add_selling_price" name="selling_price" placeholder="e.g., 1800.00" min="0" step="0.01" onchange="calculateTotalRevenue()">
+                        <small class="input-hint">Price sold to customer</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="add_total_revenue">Total Revenue</label>
+                        <input type="number" id="add_total_revenue" name="total_revenue" placeholder="e.g., 72000.00" min="0" step="0.01" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
+                        <small class="input-hint" style="color: #888; font-size: 10px; margin-top: 2px;">Auto-calculated: Qty × Selling Price</small>
                     </div>
                     <div class="form-group">
                         <label for="add_serial_no">Serial No.</label>
@@ -1169,11 +1188,20 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="edit_quantity">Qty.</label>
-                        <input type="number" id="edit_quantity" name="quantity" placeholder="e.g., 40" min="0">
+                        <input type="number" id="edit_quantity" name="quantity" placeholder="e.g., 40" min="0" step="0.01" onchange="calculateEditTotal()">
                     </div>
                     <div class="form-group">
                         <label for="edit_uom">UOM</label>
                         <input type="text" id="edit_uom" name="uom" placeholder="e.g., units, pcs">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_unit_price">Unit Price</label>
+                        <input type="number" id="edit_unit_price" name="unit_price" placeholder="e.g., 1500.00" min="0" step="0.01" onchange="calculateEditTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_total_amount">Total Amount</label>
+                        <input type="number" id="edit_total_amount" name="total_amount" placeholder="e.g., 60000.00" min="0" step="0.01" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
+                        <small class="input-hint" style="color: #888; font-size: 10px; margin-top: 2px;">Auto-calculated: Qty × Unit Price</small>
                     </div>
                     <div class="form-group">
                         <label for="edit_serial_no">Serial No.</label>
@@ -1363,6 +1391,30 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             document.getElementById('edit_highlight_color').style.display = (preset === 'custom') ? 'block' : 'none';
         }
 
+        // Auto-calculate total amount for Add Record
+        function calculateAddTotal() {
+            const qty = parseFloat(document.getElementById('add_quantity').value) || 0;
+            const price = parseFloat(document.getElementById('add_unit_price').value) || 0;
+            const total = qty * price;
+            document.getElementById('add_total_amount').value = total > 0 ? total.toFixed(2) : '';
+        }
+
+        // Auto-calculate total amount for Edit Record
+        function calculateEditTotal() {
+            const qty = parseFloat(document.getElementById('edit_quantity').value) || 0;
+            const price = parseFloat(document.getElementById('edit_unit_price').value) || 0;
+            const total = qty * price;
+            document.getElementById('edit_total_amount').value = total > 0 ? total.toFixed(2) : '';
+        }
+
+        // Auto-calculate total revenue
+        function calculateTotalRevenue() {
+            const qty = parseFloat(document.getElementById('add_quantity').value) || 0;
+            const sellingPrice = parseFloat(document.getElementById('add_selling_price').value) || 0;
+            const revenue = qty * sellingPrice;
+            document.getElementById('add_total_revenue').value = revenue > 0 ? revenue.toFixed(2) : '';
+        }
+
         function submitAddRecord(event) {
             event.preventDefault();
             showLoadingOverlay(true, 'Saving');
@@ -1377,6 +1429,10 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                 item_name:      document.getElementById('add_item_name').value,
                 quantity:       parseInt(document.getElementById('add_quantity').value) || 0,
                 uom:            document.getElementById('add_uom').value,
+                unit_price:     parseFloat(document.getElementById('add_unit_price').value) || 0,
+                total_amount:   parseFloat(document.getElementById('add_total_amount').value) || 0,
+                selling_price:  parseFloat(document.getElementById('add_selling_price').value) || 0,
+                total_revenue:  parseFloat(document.getElementById('add_total_revenue').value) || 0,
                 serial_no:      document.getElementById('add_serial_no').value,
                 company_name:   document.getElementById('add_company_name').value,
                 transferred_to: document.getElementById('add_transferred_to').value,

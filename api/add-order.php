@@ -122,8 +122,8 @@ try {
         http_response_code(201);
         echo json_encode(['success' => true, 'message' => 'Order received and moved to inventory!', 'placed_in' => 'inventory']);
     } else {
-        // Keep non-received orders in Orders until they are received
-        $company_name = 'Orders';
+        // Keep non-received orders in Purchase Orders table with their own company_name
+        $company_name = 'Purchase Order';
         $insert_sql = "INSERT INTO delivery_records 
                        (delivery_month, delivery_day, delivery_year, item_code, item_name, quantity, 
                         company_name, status, notes, created_at, updated_at) 
@@ -165,7 +165,7 @@ try {
         }
 
         http_response_code(201);
-        echo json_encode(['success' => true, 'message' => 'Order added successfully', 'order_id' => $order_id, 'placed_in' => 'orders']);
+        echo json_encode(['success' => true, 'message' => 'Order added successfully', 'order_id' => $order_id, 'placed_in' => 'purchase_orders']);
     }
     
 } catch (Exception $e) {
