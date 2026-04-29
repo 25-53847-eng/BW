@@ -83,7 +83,23 @@ if (!$stmt) {
 }
 
 $stmt->bind_param('si', $hashed_password, $_SESSION['user_id']);
-$stmt->execute();
+if (!$stmt->execute()) {
+    error_log('DB execute failed: ' . $stmt->error);
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Failed to update password: ' . $stmt->error]);
+    $stmt->close();
+    exit;
+}
+
+// Check if rows were actually affected
+if ($stmt->affected_rows === 0) {
+    error_log('No rows affected during password update for user ' . $_SESSION['user_id']);
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Password update failed - no changes made']);
+    $stmt->close();
+    exit;
+}
+
 $stmt->close();
 
 echo json_encode([

@@ -82,10 +82,11 @@ unset($_SESSION['login_attempts'], $_SESSION['login_first_attempt']);
 $_SESSION['user_id']    = $user['id'];
 $_SESSION['user_email'] = $user['email'];
 $_SESSION['user_name']  = $user['name'] ?? $user['email'];
-$_SESSION['user_role']  = $user['role'] ?? 'admin'; // Use actual role from database, default to admin
+$_SESSION['user_role']  = (!empty($user['role']) && $user['role'] !== '') ? $user['role'] : 'admin';
 
 // Determine redirect based on user role
-$redirect = ($user['role'] === 'employee') ? 'employee/index.php' : 'index.php';
+$userRole = $_SESSION['user_role'];
+$redirect = ($userRole === 'employee') ? 'employee/index.php' : 'index.php';
 
 respond([
     'success'  => true,

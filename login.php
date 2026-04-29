@@ -2,7 +2,10 @@
 session_start();
 // If already authenticated server-side, go to appropriate dashboard
 if (!empty($_SESSION['user_id'])) {
-    $redirect = ($_SESSION['user_role'] === 'employee') ? 'employee/index.php' : 'index.php';
+    // Ensure user_role is set, default to 'admin' if not
+    $role = (!empty($_SESSION['user_role']) && $_SESSION['user_role'] !== '') ? $_SESSION['user_role'] : 'admin';
+    $_SESSION['user_role'] = $role;
+    $redirect = ($role === 'employee') ? 'employee/index.php' : 'index.php';
     header('Location: ' . $redirect, true, 302);
     exit;
 }

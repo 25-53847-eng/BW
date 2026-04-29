@@ -3,26 +3,28 @@ session_start();
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: login.php');
+    header('Location: ../login.php');
     exit();
 }
 
-// Include database configuration
-require_once 'db_config.php';
+// Verify user is an employee
+if ($_SESSION['user_role'] !== 'employee') {
+    header('Location: ../index.php');
+    exit();
+}
 
-// Get logged-in user information
+require_once __DIR__ . '/../db_config.php';
+require_once __DIR__ . '/../helpers/client-helper.php';
+
 $user_id = $_SESSION['user_id'];
 $user_email = $_SESSION['user_email'] ?? 'User';
 $user_name = $_SESSION['user_name'] ?? 'User';
 
 // Get selected dataset from GET parameter or session
-// If ?dataset parameter exists in URL (even if empty), use it and update session
-// This allows "ALL DATA" to pass ?dataset= to explicitly show all data
 if (isset($_GET['dataset'])) {
     $selected_dataset = trim(strval($_GET['dataset']));
-    $_SESSION['active_dataset'] = $selected_dataset; // Set session (empty string if clicking ALL DATA)
+    $_SESSION['active_dataset'] = $selected_dataset;
 } else {
-    // No GET parameter - use session if available, otherwise null
     $selected_dataset = isset($_SESSION['active_dataset']) ? $_SESSION['active_dataset'] : null;
 }
 
@@ -32,17 +34,13 @@ if ($selected_dataset === '') {
 }
 
 // Build dataset filter for queries
-// Always exclude inventory uploads (company_name = 'Stock Addition')
-$owner_user_id = intval($_SESSION['user_id'] ?? 0);
-$dataset_filter = ' AND owner_user_id = ? AND company_name != ?';
-$dataset_filter_params = [$owner_user_id, 'Stock Addition'];
+// Employees see all company data (not filtered by owner_user_id)
+$dataset_filter = ' AND company_name != ?';
+$dataset_filter_params = ['Stock Addition'];
 if (!empty($selected_dataset)) {
     $dataset_filter .= ' AND dataset_name = ?';
     $dataset_filter_params[] = $selected_dataset;
 }
-
-// Users table is created by db_config.php (MySQL) or the SQLite bootstrap.
-// No duplicate CREATE TABLE needed here.
 
 // Get dashboard statistics
 $stats = [
@@ -105,22 +103,8 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Count unique client companies (using same logic as client-companies.php)
-$clientCompanyExpr = "NULLIF(TRIM(CASE
-                WHEN sold_to IS NOT NULL AND sold_to != '' THEN sold_to
-                WHEN company_name IS NOT NULL AND company_name != '' AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records') THEN company_name
-                ELSE ''
-            END), '')";
-$sql = "SELECT COUNT(DISTINCT {$clientCompanyExpr}) as total FROM delivery_records WHERE 1=1" . $dataset_filter;
-$stmt = $conn->prepare($sql);
-if ($stmt) {
-    bindParamsAndExecute($stmt, $dataset_filter_params);
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $stats['total_companies'] = intval($row['total']);
-    }
-    $stmt->close();
-}
+// Count unique client companies (using shared helper for consistency)
+$stats['total_companies'] = countClientCompanies($conn, $dataset_filter, $dataset_filter_params);
 
 // Count unique item codes (models)
 $sql = "SELECT COUNT(DISTINCT item_code) as total FROM delivery_records WHERE 1=1" . $dataset_filter;

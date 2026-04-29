@@ -5,6 +5,11 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
+// Ensure user_role is set
+if (empty($_SESSION['user_role'])) {
+    $_SESSION['user_role'] = 'admin';
+}
+
 // Only admins can manage employees
 if ($_SESSION['user_role'] !== 'admin') {
     header('Location: index.php', true, 302);
@@ -37,6 +42,24 @@ if ($result) {
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
     <link rel="stylesheet" href="css/style.css">
     <style>
+        /* Navbar & Layout Styles */
+        body {
+            padding-top: 0 !important;
+        }
+
+        .navbar {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 2147483647 !important;
+        }
+
+        .main-content {
+            margin-top: 120px !important;
+            z-index: 1 !important;
+        }
+
         .page-header {
             display: flex;
             justify-content: space-between;
@@ -115,8 +138,6 @@ if ($result) {
             color: #7a9dc5;
             text-transform: uppercase;
             letter-spacing: 0.7px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
 
         .table-row {
@@ -380,6 +401,144 @@ if ($result) {
             background: linear-gradient(135deg, rgba(244, 67, 54, 0.9), rgba(211, 47, 47, 0.9));
         }
 
+        /* Delete Confirmation Modal */
+        .delete-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1500;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .delete-modal.active {
+            display: flex;
+        }
+
+        .delete-modal-content {
+            background: linear-gradient(135deg, #f5f9ff 0%, #eef4fa 100%);
+            border: 1px solid rgba(91, 188, 255, 0.3);
+            border-radius: 12px;
+            padding: 0;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            animation: scaleIn 0.2s ease;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.95);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .delete-modal-header {
+            padding: 24px 24px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .delete-modal-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, rgba(255, 107, 107, 0.2), rgba(244, 67, 54, 0.15));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ff6b6b;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .delete-modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #1a2a3a;
+            margin: 0;
+        }
+
+        .delete-modal-body {
+            padding: 0 24px 24px;
+        }
+
+        .delete-modal-message {
+            color: #2a3a4a;
+            font-size: 13px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+
+        .delete-modal-employee-name {
+            color: #ff6b6b;
+            font-weight: 600;
+        }
+
+        .delete-modal-warning {
+            padding: 12px 14px;
+            background: linear-gradient(135deg, rgba(255, 193, 7, 0.15), rgba(255, 152, 0, 0.1));
+            border-left: 3px solid #ffc107;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #d97706;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+
+        .delete-modal-footer {
+            padding: 16px 24px 24px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .delete-btn-cancel {
+            flex: 1;
+            padding: 11px;
+            background: rgba(91, 188, 255, 0.15);
+            color: #2f5fa7;
+            border: 1px solid rgba(91, 188, 255, 0.4);
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .delete-btn-cancel:hover {
+            background: rgba(91, 188, 255, 0.25);
+            border-color: #2f5fa7;
+        }
+
+        .delete-btn-confirm {
+            flex: 1;
+            padding: 11px;
+            background: linear-gradient(135deg, #ff6b6b, #f44336);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .delete-btn-confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(244, 67, 54, 0.4);
+        }
+
         @keyframes slideIn {
             from {
                 transform: translateX(400px);
@@ -390,9 +549,75 @@ if ($result) {
                 opacity: 1;
             }
         }
+
+        body.light-mode .employees-table {
+            background: linear-gradient(135deg, #f5f9ff 0%, #eef4fa 100%);
+        }
+
+        body.light-mode .table-header {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(91, 188, 255, 0.1) 100%);
+            border-bottom-color: rgba(91, 188, 255, 0.3);
+        }
+
+        body.light-mode .table-row {
+            border-bottom-color: rgba(0, 0, 0, 0.05);
+        }
+
+        body.light-mode .table-row:hover {
+            background: linear-gradient(135deg, rgba(91, 188, 255, 0.1) 0%, rgba(47, 95, 167, 0.08) 100%);
+        }
+
+        body.light-mode .employee-name {
+            color: #1a2a3a;
+        }
+
+        body.light-mode .employee-email {
+            color: #3a5a7a;
+        }
     </style>
 </head>
 <body>
+    <!-- TOP NAVBAR -->
+    <nav class="navbar">
+        <div class="navbar-container">
+            <!-- Hamburger Toggle & Logo -->
+            <div class="navbar-start">
+                <button class="hamburger-btn" id="hamburgerBtn" aria-label="Toggle sidebar">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+                <div class="logo">
+                    <a href="index.php" style="display:flex;align-items:center;">
+                        <img src="assets/logo.png" alt="Andison" style="height:48px;width:auto;object-fit:contain;">
+                    </a>
+                </div>
+            </div>
+
+            <!-- Center Title -->
+            <div class="navbar-center">
+                <h1 class="dashboard-title">Manage Employees</h1>
+            </div>
+
+            <!-- Right Profile Section -->
+            <div class="navbar-end">
+                <div class="profile-dropdown">
+                    <button type="button" class="profile-btn" id="profileBtn" aria-label="Profile menu">
+                        <span class="profile-name"><?php echo htmlspecialchars(isset($_SESSION['user_name']) ? $_SESSION['user_name'] : 'User'); ?></span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu" id="profileMenu">
+                        <a href="profile.php"><i class="fas fa-user"></i> My Profile</a>
+                        <a href="settings.php"><i class="fas fa-cog"></i> Settings</a>
+                        <a href="help.php"><i class="fas fa-question-circle"></i> Help</a>
+                        <hr>
+                        <a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
     <!-- Sidebar -->
     <?php include 'sidebar.php'; ?>
 
@@ -493,6 +718,32 @@ if ($result) {
         </div>
     </div>
 
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteConfirmModal" class="delete-modal">
+        <div class="delete-modal-content">
+            <div class="delete-modal-header">
+                <div class="delete-modal-icon">
+                    <i class="fas fa-exclamation"></i>
+                </div>
+                <h2 class="delete-modal-title">Delete Employee</h2>
+            </div>
+            <div class="delete-modal-body">
+                <p class="delete-modal-message">
+                    Are you sure you want to delete the employee account for <span class="delete-modal-employee-name" id="deleteEmployeeName"></span>?
+                </p>
+                <div class="delete-modal-warning">
+                    <i class="fas fa-info-circle" style="flex-shrink: 0; margin-top: 2px;"></i>
+                    <span>This action cannot be undone.</span>
+                </div>
+            </div>
+            <div class="delete-modal-footer">
+                <button class="delete-btn-cancel" onclick="closeDeleteConfirmation()">Cancel</button>
+                <button class="delete-btn-confirm" onclick="confirmDeleteEmployee()">Delete</button>
+            </div>
+            <input type="hidden" id="deleteEmployeeId">
+        </div>
+    </div>
+
     <!-- Notification -->
     <div id="notification" class="notification"></div>
 
@@ -572,10 +823,19 @@ if ($result) {
             }
         }
 
-        async function deleteEmployee(id, name) {
-            if (!confirm(`Are you sure you want to delete the employee account for "${name}"? This action cannot be undone.`)) {
-                return;
-            }
+        function openDeleteConfirmation(id, name) {
+            document.getElementById('deleteEmployeeId').value = id;
+            document.getElementById('deleteEmployeeName').textContent = name;
+            document.getElementById('deleteConfirmModal').classList.add('active');
+        }
+
+        function closeDeleteConfirmation() {
+            document.getElementById('deleteConfirmModal').classList.remove('active');
+        }
+
+        async function confirmDeleteEmployee() {
+            const id = document.getElementById('deleteEmployeeId').value;
+            closeDeleteConfirmation();
 
             const formData = new FormData();
             formData.append('action', 'delete');
@@ -603,6 +863,10 @@ if ($result) {
             }
         }
 
+        async function deleteEmployee(id, name) {
+            openDeleteConfirmation(id, name);
+        }
+
         function showNotification(message, type = 'success') {
             const notification = document.getElementById('notification');
             notification.textContent = message;
@@ -617,6 +881,12 @@ if ($result) {
         document.getElementById('employeeModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 closeEmployeeModal();
+            }
+        });
+
+        document.getElementById('deleteConfirmModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDeleteConfirmation();
             }
         });
     </script>

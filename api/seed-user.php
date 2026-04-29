@@ -7,18 +7,23 @@ $conn->query("CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'admin' NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-$name     = 'Admin';
-$email    = 'admin@andison.com';
-$password = password_hash('Admin@1234', PASSWORD_DEFAULT);
+// Ensure role column exists (for existing databases)
+$conn->query("ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'admin' NOT NULL");
 
-$stmt = $conn->prepare('INSERT INTO users (name, email, password) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password = VALUES(password)');
-$stmt->bind_param('sss', $name, $email, $password);
+$name     = 'Angeli Uybomping';
+$email    = 'angeli.uybomping@andisonindustrial.com';
+$password = password_hash('test123', PASSWORD_DEFAULT);
+$role     = 'admin';
+
+$stmt = $conn->prepare('INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE password = VALUES(password), role = VALUES(role)');
+$stmt->bind_param('ssss', $name, $email, $password, $role);
 
 if ($stmt->execute()) {
-    echo json_encode(['success' => true, 'message' => 'Test user created.', 'email' => $email, 'password' => 'Admin@1234']);
+    echo json_encode(['success' => true, 'message' => 'Admin user created.', 'email' => $email, 'password' => 'test123']);
 } else {
     echo json_encode(['success' => false, 'message' => $conn->error]);
 }

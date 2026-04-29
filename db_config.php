@@ -85,7 +85,11 @@ try {
 
     safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(32) DEFAULT NULL");
     safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN two_factor_enabled TINYINT(1) DEFAULT 0");
-        safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN profile_picture VARCHAR(500) DEFAULT NULL");
+    safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN profile_picture VARCHAR(500) DEFAULT NULL");
+    safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'admin'");
+    
+    // Assign role='admin' to any existing users who don't have a role set
+    safeSchemaUpgrade($conn, "UPDATE users SET role = 'admin' WHERE role IS NULL OR role = ''");
 
     // Keep owner field sticky for inserts made through the scoped view.
     $conn->query('DROP TRIGGER IF EXISTS trg_delivery_records_set_owner');

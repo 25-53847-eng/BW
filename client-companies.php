@@ -8,14 +8,7 @@ if (empty($_SESSION['user_id'])) {
 // Include database configuration
 require_once 'db_config.php';
 require_once 'dataset-indicator.php';
-
-function resolveClientCompanyExpr(): string {
-    return "NULLIF(TRIM(CASE
-                WHEN sold_to IS NOT NULL AND sold_to != '' THEN sold_to
-                WHEN company_name IS NOT NULL AND company_name != '' AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records') THEN company_name
-                ELSE ''
-            END), '')";
-}
+require_once 'helpers/client-helper.php';
 
 // Get selected dataset from URL or session
 $selected_dataset = isset($_GET['dataset']) ? trim($_GET['dataset']) : (isset($_SESSION['active_dataset']) ? $_SESSION['active_dataset'] : 'all');
@@ -25,34 +18,16 @@ if (isset($_GET['dataset'])) {
     $_SESSION['active_dataset'] = $selected_dataset;
 }
 
-// Build dataset filter
+// Build dataset filter for prepared statements
 $dataset_filter = "";
+$dataset_filter_params = [];
 if ($selected_dataset !== 'all' && $selected_dataset !== '') {
-    $safe_dataset = $conn->real_escape_string($selected_dataset);
-    $dataset_filter = " AND dataset_name = '$safe_dataset'";
+    $dataset_filter = " AND dataset_name = ?";
+    $dataset_filter_params[] = $selected_dataset;
 }
 
-// Get all unique companies with their stats
-$companies = [];
-$clientCompanyExpr = resolveClientCompanyExpr();
-$result = $conn->query("
-    SELECT 
-        $clientCompanyExpr as company_name,
-        COUNT(*) as total_orders,
-        SUM(quantity) as total_units,
-        COUNT(DISTINCT item_code) as unique_products,
-        MAX(delivery_date) as last_delivery,
-        MAX(delivery_month) as last_month
-    FROM delivery_records 
-    WHERE $clientCompanyExpr IS NOT NULL$dataset_filter
-    GROUP BY $clientCompanyExpr 
-    ORDER BY total_units DESC
-");
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $companies[] = $row;
-    }
-}
+// Get all unique companies with their stats (using shared helper)
+$companies = getClientCompaniesWithStats($conn, $dataset_filter, $dataset_filter_params);
 
 // Get total stats
 $total_companies = count($companies);

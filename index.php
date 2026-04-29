@@ -7,8 +7,20 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Ensure user_role is set, default to admin
+if (empty($_SESSION['user_role'])) {
+    $_SESSION['user_role'] = 'admin';
+}
+
+// Check if user is employee - redirect them
+if ($_SESSION['user_role'] === 'employee') {
+    header('Location: employee/index.php');
+    exit();
+}
+
 // Include database configuration
 require_once 'db_config.php';
+require_once 'helpers/client-helper.php';
 
 // Get logged-in user information
 $user_id = $_SESSION['user_id'];
@@ -32,10 +44,9 @@ if ($selected_dataset === '') {
 }
 
 // Build dataset filter for queries
-// Always exclude inventory uploads (company_name = 'Stock Addition')
-$owner_user_id = intval($_SESSION['user_id'] ?? 0);
-$dataset_filter = ' AND owner_user_id = ? AND company_name != ?';
-$dataset_filter_params = [$owner_user_id, 'Stock Addition'];
+// Admins see all data; exclude inventory uploads
+$dataset_filter = ' AND company_name != ?';
+$dataset_filter_params = ['Stock Addition'];
 if (!empty($selected_dataset)) {
     $dataset_filter .= ' AND dataset_name = ?';
     $dataset_filter_params[] = $selected_dataset;
@@ -105,22 +116,8 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Count unique client companies (using same logic as client-companies.php)
-$clientCompanyExpr = "NULLIF(TRIM(CASE
-                WHEN sold_to IS NOT NULL AND sold_to != '' THEN sold_to
-                WHEN company_name IS NOT NULL AND company_name != '' AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records') THEN company_name
-                ELSE ''
-            END), '')";
-$sql = "SELECT COUNT(DISTINCT {$clientCompanyExpr}) as total FROM delivery_records WHERE 1=1" . $dataset_filter;
-$stmt = $conn->prepare($sql);
-if ($stmt) {
-    bindParamsAndExecute($stmt, $dataset_filter_params);
-    $result = $stmt->get_result();
-    if ($row = $result->fetch_assoc()) {
-        $stats['total_companies'] = intval($row['total']);
-    }
-    $stmt->close();
-}
+// Count unique client companies (using shared helper for consistency)
+$stats['total_companies'] = countClientCompanies($conn, $dataset_filter, $dataset_filter_params);
 
 // Count unique item codes (models)
 $sql = "SELECT COUNT(DISTINCT item_code) as total FROM delivery_records WHERE 1=1" . $dataset_filter;

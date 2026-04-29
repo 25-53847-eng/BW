@@ -1,25 +1,18 @@
 <?php
-// Buffer all output so PHP warnings/notices never corrupt the JSON response
+// Employee account signup has been disabled.
+// Administrators create employee accounts through the Manage Employees page.
+// Redirect clients to login page.
+
 ob_start();
-
 session_start();
-
 header('Content-Type: application/json; charset=utf-8');
-
-require_once __DIR__ . '/../db_config.php';
-
-/** Send clean JSON and exit — discards any buffered PHP warnings first. */
-function respond(array $data, int $status = 200): never {
-    http_response_code($status);
-    ob_clean();
-    echo json_encode($data);
-    exit;
-}
-
-// Only accept POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    respond(['success' => false, 'message' => 'Method not allowed'], 405);
-}
+http_response_code(403);
+ob_clean();
+echo json_encode([
+    'success' => false,
+    'message' => 'Account creation is disabled. Please contact your administrator to request an account.'
+]);
+exit;
 
 // ---- Rate limiting (max 10 attempts per 15 min per session) ----
 $_SESSION['signup_attempts']      = $_SESSION['signup_attempts']      ?? 0;

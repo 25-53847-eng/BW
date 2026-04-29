@@ -7,8 +7,12 @@ $conn->query("CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
+  role VARCHAR(50) DEFAULT 'employee' NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+// Ensure role column exists (for existing databases)
+$conn->query("ALTER TABLE users ADD COLUMN role VARCHAR(50) DEFAULT 'employee' NOT NULL");
 
 $name     = 'Admin';
 $email    = 'admin@andison.com';
