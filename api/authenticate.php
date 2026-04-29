@@ -47,7 +47,7 @@ if (!$email || !$password) {
 }
 
 // ---- Fetch user ----
-$stmt = $conn->prepare('SELECT id, name, email, password FROM users WHERE email = ? LIMIT 1');
+$stmt = $conn->prepare('SELECT id, name, email, password, role FROM users WHERE email = ? LIMIT 1');
 if (!$stmt) {
     error_log('DB prepare failed: ' . $conn->error);
     respond(['success' => false, 'message' => 'Internal server error'], 500);
@@ -82,10 +82,13 @@ unset($_SESSION['login_attempts'], $_SESSION['login_first_attempt']);
 $_SESSION['user_id']    = $user['id'];
 $_SESSION['user_email'] = $user['email'];
 $_SESSION['user_name']  = $user['name'] ?? $user['email'];
-$_SESSION['user_role']  = 'admin'; // Default to admin role (can be overridden by employee login)
+$_SESSION['user_role']  = $user['role'] ?? 'admin'; // Use actual role from database, default to admin
+
+// Determine redirect based on user role
+$redirect = ($user['role'] === 'employee') ? 'employee/index.php' : 'index.php';
 
 respond([
     'success'  => true,
     'message'  => 'Login successful',
-    'redirect' => 'index.php'
+    'redirect' => $redirect
 ]);

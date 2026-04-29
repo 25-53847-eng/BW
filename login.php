@@ -1,8 +1,9 @@
 <?php
 session_start();
-// If already authenticated server-side, go to dashboard
+// If already authenticated server-side, go to appropriate dashboard
 if (!empty($_SESSION['user_id'])) {
-    header('Location: index.php', true, 302);
+    $redirect = ($_SESSION['user_role'] === 'employee') ? 'employee/index.php' : 'index.php';
+    header('Location: ' . $redirect, true, 302);
     exit;
 }
 ?>
@@ -108,11 +109,6 @@ if (!empty($_SESSION['user_id'])) {
                         <span class="btn-text">Login</span>
                     </button>
                 </form>
-
-                <!-- Sign Up Link -->
-                <div class="signup-link">
-                    Don't have an account? <a href="signup.php">Sign up here</a>
-                </div>
 
             </div>
         </div>
