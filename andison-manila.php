@@ -732,9 +732,11 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                         Andison Manila Deliveries
                     </div>
                     <div style="display:flex;gap:12px;align-items:center;">
+                        <?php if ($dataset_is_enabled): ?>
                         <button class="btn-add-record" onclick="openAddModal()">
                             <i class="fas fa-plus"></i> Add Record
                         </button>
+                        <?php endif; ?>
                         <a href="javascript:history.back()" class="back-btn">
                             <i class="fas fa-arrow-left"></i> Back
                         </a>

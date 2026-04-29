@@ -6,6 +6,11 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
+require_once 'dataset-indicator.php';
+require_once 'api/dataset-status-helper.php';
+
+// Check if dataset is enabled
+$dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
 
 // Function to identify grouping based on item name
 function identifyGrouping($itemName) {
@@ -1746,9 +1751,11 @@ if ($poItemsQuery) {
                         <?php endif; ?>
                     </form>
                 </div>
+                <?php if ($dataset_is_enabled): ?>
                 <button class="add-stock-btn" id="addNewItemBtn" style="background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%);" onclick="openAddItemModal()">
                     <i class="fas fa-plus"></i> Add New Item
                 </button>
+                <?php endif; ?>
             </div>
 
             <!-- Tab Navigation -->
@@ -2062,9 +2069,11 @@ if ($poItemsQuery) {
             <!-- Orders Tab Content -->
             <div id="orders-tab" class="tab-content">
                 <div style="margin-bottom: 20px;">
+                    <?php if ($dataset_is_enabled): ?>
                     <button class="add-stock-btn" style="background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%);" onclick="openCreateOrderModal()">
                         <i class="fas fa-plus"></i> Create Purchase Order
                     </button>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Order Filters -->

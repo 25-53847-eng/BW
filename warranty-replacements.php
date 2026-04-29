@@ -7,6 +7,10 @@ if (empty($_SESSION['user_id'])) {
 
 require_once 'db_config.php';
 require_once 'dataset-indicator.php';
+require_once 'api/dataset-status-helper.php';
+
+// Check if dataset is enabled
+$dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
 
 // Initialize warranty table if needed
 if (!($conn instanceof mysqli)) {
@@ -891,9 +895,11 @@ if ($companies_result) {
                             Records flagged with RED text during import
                         </p>
                     </div>
+                    <?php if ($dataset_is_enabled): ?>
                     <button type="button" class="btn-add-record" onclick="openAddWarrantyModal()">
                         <i class="fas fa-plus"></i> Add New Record
                     </button>
+                    <?php endif; ?>
                 </div>
             </div>
 

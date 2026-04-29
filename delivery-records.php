@@ -10,6 +10,10 @@ require_once 'db_config.php';
 
 // Include dataset indicator helper
 require_once 'dataset-indicator.php';
+require_once 'api/dataset-status-helper.php';
+
+// Check if dataset is enabled
+$dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
 
 function isLegendMarkerRow(array $row): bool {
     $groupings = strtolower(trim((string) ($row['groupings'] ?? '')));
@@ -1619,9 +1623,11 @@ if (empty($allItems)) {
             <button class="btn-export" onclick="exportToExcel()">
                 <i class="fas fa-file-excel"></i> Export
             </button>
+            <?php if ($dataset_is_enabled): ?>
             <button class="btn-add-record" onclick="openAddModal()">
                 <i class="fas fa-plus"></i> Add Record
             </button>
+            <?php endif; ?>
         </div>
 
         <!-- Grouping Filters -->

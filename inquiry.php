@@ -7,8 +7,11 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
+require_once 'dataset-indicator.php';
+require_once 'api/dataset-status-helper.php';
 
-$selectedDataset = isset($_GET['dataset']) ? trim((string) $_GET['dataset']) : (isset($_SESSION['active_dataset']) ? trim((string) $_SESSION['active_dataset']) : 'all');
+// Check if dataset is enabled
+$dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
 
 function h($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
@@ -498,7 +501,9 @@ $canAddInquiry = is_inquiry_admin();
                     <p class="page-subtitle">Client products that are still in inquiry status and have not yet been finalized into a PO. Once the PO is received, continue from Delivery Records.</p>
                 </div>
                 <div class="page-actions">
+                    <?php if ($dataset_is_enabled): ?>
                     <button class="action-btn primary" type="button" id="openInquiryModalBtn"><i class="fas fa-plus"></i> Add Inquiry</button>
+                    <?php endif; ?>
                     <a class="action-btn secondary" href="delivery-records.php"><i class="fas fa-truck"></i> Delivery Records</a>
                 </div>
             </div>
