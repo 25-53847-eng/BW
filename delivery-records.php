@@ -7,6 +7,7 @@ if (empty($_SESSION['user_id'])) {
 
 // Include database configuration
 require_once 'db_config.php';
+require_once 'api/permission-helper.php';
 
 // Include dataset indicator helper
 require_once 'dataset-indicator.php';
@@ -869,7 +870,7 @@ if (empty($allItems)) {
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            padding: 20px;
+            padding: 100px 20px 80px 20px;
         }
         
         body.modal-open {
@@ -890,7 +891,7 @@ if (empty($allItems)) {
         /* Larger modal for Add Record */
         .modal-content.modal-large {
             max-width: 750px;
-            padding: 30px;
+            padding: 30px 30px 60px 30px;
             max-height: calc(100vh - 40px);
             overflow-y: auto;
             box-sizing: border-box;
@@ -1510,6 +1511,15 @@ if (empty($allItems)) {
                 transform: translateY(0);
             }
         }
+
+        /* Delivery Records - Add top spacing for header clearance */
+        #mainContent {
+            padding-top: 50px;
+        }
+
+        #mainContent .page-title {
+            margin-top: 20px;
+        }
     </style>
     <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.3/dist/dotlottie-wc.js" type="module"></script>
 </head>
@@ -1623,7 +1633,7 @@ if (empty($allItems)) {
             <button class="btn-export" onclick="exportToExcel()">
                 <i class="fas fa-file-excel"></i> Export
             </button>
-            <?php if ($dataset_is_enabled): ?>
+            <?php if ($dataset_is_enabled && isPermissionEnabled('delivery_add_records', $conn)): ?>
             <button class="btn-add-record" onclick="openAddModal()">
                 <i class="fas fa-plus"></i> Add Record
             </button>
@@ -1866,8 +1876,12 @@ if (empty($allItems)) {
                         <td class="action-cell">
                             <div class="action-buttons">
                                 <a href="#" class="view-btn" onclick="openModal(event, <?php echo (int)($record['id'] ?? 0); ?>)"><i class="fas fa-eye"></i> View</a>
+                                <?php if (isPermissionEnabled('delivery_edit_records', $conn)): ?>
                                 <a href="#" class="edit-btn" onclick="openEditModal(event, <?php echo (int)($record['id'] ?? 0); ?>)"><i class="fas fa-edit"></i> Edit</a>
+                                <?php endif; ?>
+                                <?php if (isPermissionEnabled('delivery_delete_records', $conn)): ?>
                                 <a href="#" class="delete-btn" onclick="deleteRecord(event, <?php echo (int)($record['id'] ?? 0); ?>, '<?php echo htmlspecialchars((string)($record['item_code'] ?? ''), ENT_QUOTES); ?>')"><i class="fas fa-trash"></i> Delete</a>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>

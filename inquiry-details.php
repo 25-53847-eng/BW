@@ -6,6 +6,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
+require_once 'api/permission-helper.php';
 
 function inq_id($id) {
     return 'INQ-' . str_pad((string) $id, 3, '0', STR_PAD_LEFT);
@@ -276,12 +277,16 @@ $autoEditMode = isset($_GET['edit']);
                         <div style="padding: 11px 14px; background: #f8f9fa; border-radius: 8px; color: #2c3e50; font-size: 14px; min-height: 60px; line-height: 1.5;"><?php echo nl2br(h($inquiry['notes'])) ?: '—'; ?></div>
                     </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <?php if (isPermissionEnabled('inquiry_edit_records', $conn)): ?>
                         <a href="inquiry-details.php?id=<?php echo $inquiryId; ?>&edit=1" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border-radius: 8px; background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%); border: none; color: #17324d; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s ease; text-decoration: none;" onmouseover="this.style.transform='translateY(-2px)';" onmouseout="this.style.transform='translateY(0)';">
                             <i class="fas fa-edit"></i> Edit
                         </a>
+                        <?php endif; ?>
+                        <?php if (isPermissionEnabled('inquiry_delete_records', $conn)): ?>
                         <button type="button" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border-radius: 8px; background: #e74c3c; border: none; color: #ffffff; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.opacity='0.9';" onmouseout="this.style.opacity='1';" onclick="document.getElementById('deleteConfirmModal').style.display='flex';"> 
                             <i class="fas fa-trash"></i> Delete
                         </button>
+                        <?php endif; ?>
                     </div>
                 </div>
 

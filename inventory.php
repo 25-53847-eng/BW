@@ -6,6 +6,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
+require_once 'api/permission-helper.php';
 require_once 'dataset-indicator.php';
 require_once 'api/dataset-status-helper.php';
 
@@ -1751,7 +1752,7 @@ if ($poItemsQuery) {
                         <?php endif; ?>
                     </form>
                 </div>
-                <?php if ($dataset_is_enabled): ?>
+                <?php if ($dataset_is_enabled && isPermissionEnabled('inventory_add_item', $conn)): ?>
                 <button class="add-stock-btn" id="addNewItemBtn" style="background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%);" onclick="openAddItemModal()">
                     <i class="fas fa-plus"></i> Add New Item
                 </button>
@@ -2032,9 +2033,11 @@ if ($poItemsQuery) {
                                 <button class="action-btn action-view action-btn-horizontal" title="View" onclick="viewItemDetails('<?php echo htmlspecialchars($item['code']); ?>', '<?php echo htmlspecialchars($item['name']); ?>', <?php echo $item['stock']; ?>)">
                                     <i class="fas fa-eye"></i>
                                 </button>
+                                <?php if (isPermissionEnabled('inventory_delete_item', $conn)): ?>
                                 <button class="action-btn action-delete action-btn-horizontal" title="Delete" onclick="confirmDeleteItem('<?php echo htmlspecialchars($item['code']); ?>', '<?php echo htmlspecialchars($item['name']); ?>')">
                                     <i class="fas fa-trash"></i>
                                 </button>
+                                <?php endif; ?>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -2069,7 +2072,7 @@ if ($poItemsQuery) {
             <!-- Orders Tab Content -->
             <div id="orders-tab" class="tab-content">
                 <div style="margin-bottom: 20px;">
-                    <?php if ($dataset_is_enabled): ?>
+                    <?php if ($dataset_is_enabled && isPermissionEnabled('inventory_create_po', $conn)): ?>
                     <button class="add-stock-btn" style="background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%);" onclick="openCreateOrderModal()">
                         <i class="fas fa-plus"></i> Create Purchase Order
                     </button>
@@ -2220,7 +2223,9 @@ if ($poItemsQuery) {
                                     <td style="text-align: center; white-space: nowrap;">
                                         <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
                                             <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #60a8ff; background: rgba(96, 168, 255, 0.14); transition: all 0.2s ease; cursor: pointer;" href="po-details.php?id=<?php echo intval($order['id']); ?>&mode=view" onclick="event.stopPropagation();"><i class="fas fa-eye"></i> View</a>
+                                            <?php if (isPermissionEnabled('inventory_create_po', $conn)): ?>
                                             <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #f3be4d; background: rgba(243, 190, 77, 0.14); transition: all 0.2s ease; cursor: pointer;" href="po-details.php?id=<?php echo intval($order['id']); ?>&mode=edit" onclick="event.stopPropagation();"><i class="fas fa-pen"></i> Edit</a>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>

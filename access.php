@@ -4,6 +4,12 @@ if (empty($_SESSION['user_id'])) {
     header('Location: login.php', true, 302);
     exit;
 }
+
+// Only admins can access this page
+if (($_SESSION['user_role'] ?? 'admin') !== 'admin') {
+    http_response_code(403);
+    die('Access Denied: Only administrators can access this page.');
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">

@@ -8,6 +8,7 @@ if (empty($_SESSION['user_id'])) {
 require_once 'db_config.php';
 require_once 'dataset-indicator.php';
 require_once 'api/dataset-status-helper.php';
+require_once 'api/permission-helper.php';
 
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
@@ -895,7 +896,7 @@ if ($companies_result) {
                             Records flagged with RED text during import
                         </p>
                     </div>
-                    <?php if ($dataset_is_enabled): ?>
+                    <?php if ($dataset_is_enabled && isPermissionEnabled('warranty_manage_records', $conn)): ?>
                     <button type="button" class="btn-add-record" onclick="openAddWarrantyModal()">
                         <i class="fas fa-plus"></i> Add New Record
                     </button>
@@ -1020,12 +1021,14 @@ if ($companies_result) {
                                             <button class="btn-small btn-view" onclick="viewWarrantyDetail(<?php echo $record['id']; ?>)" title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </button>
+                                            <?php if (isPermissionEnabled('warranty_manage_records', $conn)): ?>
                                             <button class="btn-small btn-status" onclick="editWarrantyStatus(<?php echo $record['id']; ?>, '<?php echo htmlspecialchars($record['status'] ?? 'Warranty Pending', ENT_QUOTES); ?>')" title="Update Status">
                                                 <i class="fas fa-pen"></i>
                                             </button>
                                             <button class="btn-small btn-delete" onclick="deleteWarrantyRecord(<?php echo $record['id']; ?>)" title="Delete Record">
                                                 <i class="fas fa-trash"></i>
                                             </button>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>

@@ -11,12 +11,17 @@
  * @return bool True if permission is enabled
  */
 function isPermissionEnabled($permission_name, $conn) {
-    // If not employee, always allow (admin)
-    if (($_SESSION['user_role'] ?? 'admin') !== 'employee') {
+    // Determine if this is being called from an employee context
+    // Employee pages are in /employee/ folder
+    $scriptPath = $_SERVER['SCRIPT_FILENAME'] ?? '';
+    $isEmployeeContext = strpos($scriptPath, '/employee/') !== false || strpos($scriptPath, '\\employee\\') !== false;
+    
+    // If NOT in employee context (admin pages), always allow
+    if (!$isEmployeeContext) {
         return true;
     }
     
-    // Check if permission is enabled in database
+    // For employee pages, ALWAYS check the database permission
     $stmt = $conn->prepare("SELECT enabled FROM employee_permissions WHERE permission_name = ? LIMIT 1");
     if (!$stmt) {
         return false;

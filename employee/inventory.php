@@ -2269,7 +2269,9 @@ if ($poItemsQuery) {
                                     <td style="text-align: center; white-space: nowrap;">
                                         <div style="display: inline-flex; align-items: center; justify-content: center; gap: 8px;">
                                             <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #60a8ff; background: rgba(96, 168, 255, 0.14); transition: all 0.2s ease; cursor: pointer;" href="po-details.php?id=<?php echo intval($order['id']); ?>" onclick="event.stopPropagation();"><i class="fas fa-eye"></i> View</a>
+                                            <?php if ($canCreatePO): ?>
                                             <a style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; text-decoration: none; color: #f3be4d; background: rgba(243, 190, 77, 0.14); transition: all 0.2s ease; cursor: pointer;" href="po-details.php?id=<?php echo intval($order['id']); ?>&edit=1" onclick="event.stopPropagation();"><i class="fas fa-pen"></i> Edit</a>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>

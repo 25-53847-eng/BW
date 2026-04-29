@@ -6,6 +6,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
+require_once 'api/permission-helper.php';
 
 // Get all deliveries to "to Andison Manila" with full details
 $companyName = 'to Andison Manila';
@@ -732,7 +733,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                         Andison Manila Deliveries
                     </div>
                     <div style="display:flex;gap:12px;align-items:center;">
-                        <?php if ($dataset_is_enabled): ?>
+                        <?php if ($dataset_is_enabled && isPermissionEnabled('andison_add_records', $conn)): ?>
                         <button class="btn-add-record" onclick="openAddModal()">
                             <i class="fas fa-plus"></i> Add Record
                         </button>
@@ -872,8 +873,10 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                                 <td style="text-align: center;">
                                     <div class="action-buttons">
                                         <a href="#" class="view-btn" onclick="openModal(event, <?php echo intval($record['id'] ?? 0); ?>)" title="View Record">View</a>
+                                        <?php if (isPermissionEnabled('andison_add_records', $conn)): ?>
                                         <a href="#" class="edit-btn" onclick="openEditModal(event, <?php echo intval($record['id'] ?? 0); ?>)" title="Edit Record"><i class="fas fa-edit"></i></a>
                                         <a href="#" class="delete-btn" onclick="deleteRecord(event, <?php echo intval($record['id'] ?? 0); ?>, '<?php echo htmlspecialchars($record['serial_no'] ?? ''); ?>')" title="Delete Record"><i class="fas fa-trash-alt"></i></a>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>

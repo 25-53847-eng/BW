@@ -881,7 +881,7 @@ if (empty($allItems)) {
             display: flex;
             align-items: flex-start;
             justify-content: center;
-            padding: 20px;
+            padding: 100px 20px 80px 20px;
         }
         
         body.modal-open {
@@ -902,7 +902,7 @@ if (empty($allItems)) {
         /* Larger modal for Add Record */
         .modal-content.modal-large {
             max-width: 750px;
-            padding: 30px;
+            padding: 30px 30px 60px 30px;
             max-height: calc(100vh - 40px);
             overflow-y: auto;
             box-sizing: border-box;
@@ -1521,6 +1521,15 @@ if (empty($allItems)) {
                 opacity: 1;
                 transform: translateY(0);
             }
+        }
+
+        /* Delivery Records - Add top spacing for header clearance */
+        #mainContent {
+            padding-top: 50px;
+        }
+
+        #mainContent .page-title {
+            margin-top: 20px;
         }
     </style>
     <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.3/dist/dotlottie-wc.js" type="module"></script>

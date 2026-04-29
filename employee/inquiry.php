@@ -517,7 +517,7 @@ if ($listResult) {
                     <p class="page-subtitle">Client products that are still in inquiry status and have not yet been finalized into a PO. Once the PO is received, continue from Delivery Records.</p>
                 </div>
                 <div class="page-actions">
-                    <?php if ($canAddInquiry && $dataset_is_enabled): ?>
+                    <?php if ($dataset_is_enabled && isPermissionEnabled('inquiry_add_records', $conn)): ?>
                     <button class="action-btn primary" type="button" id="openInquiryModalBtn"><i class="fas fa-plus"></i> Add Inquiry</button>
                     <?php endif; ?>
                     <a class="action-btn secondary" href="delivery-records.php"><i class="fas fa-truck"></i> Delivery Records</a>

@@ -1,9 +1,5 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_role'])) {
-    $_SESSION['user_role'] = 'employee';
-}
-
 if (empty($_SESSION['user_id'])) {
     header('Location: ../login.php', true, 302);
     exit;
@@ -26,21 +22,15 @@ if ($inquiryId <= 0) {
     exit;
 }
 
-$owner_user_id = intval($_SESSION['user_id']);
-
-// Check permissions for inquiry editing
-$canEditInquiry = isPermissionEnabled('inquiry_edit_records', $conn);
-$canDeleteInquiry = isPermissionEnabled('inquiry_delete_records', $conn);
-
 $flash = $_SESSION['inquiry_detail_flash'] ?? null;
 unset($_SESSION['inquiry_detail_flash']);
 
-// Fetch inquiry record (with ownership filter)
-$fetch = $conn->prepare("SELECT * FROM delivery_records WHERE id = ? AND company_name = 'Inquiry' AND owner_user_id = ? LIMIT 1");
+// Fetch inquiry record
+$fetch = $conn->prepare("SELECT * FROM delivery_records WHERE id = ? AND company_name = 'Inquiry' LIMIT 1");
 if (!$fetch) {
     die('Database error: ' . $conn->error);
 }
-$fetch->bind_param('ii', $inquiryId, $owner_user_id);
+$fetch->bind_param('i', $inquiryId);
 $fetch->execute();
 $result = $fetch->get_result();
 
@@ -53,6 +43,10 @@ $inquiry = $result->fetch_assoc();
 $fetch->close();
 
 $inquiryRefId = inq_id($inquiry['id']);
+
+// Check permissions
+$canEditInquiry = isPermissionEnabled('inquiry_edit_records', $conn);
+$canDeleteInquiry = isPermissionEnabled('inquiry_delete_records', $conn);
 
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -117,15 +111,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                               po_status = ?, notes = ?, delivery_month = ?,
                               delivery_day = ?, delivery_year = ?, delivery_date = ?,
                               company_name = ?, status = ?, updated_at = CURRENT_TIMESTAMP
-                          WHERE id = ? AND company_name = 'Inquiry' AND owner_user_id = ?";
+                          WHERE id = ? AND company_name = 'Inquiry'";
             
             $stmt = $conn->prepare($updateSql);
             if ($stmt) {
-                $stmt->bind_param('ssssiddssssiisssii', $customer, $orderDate, $itemCode, $itemName, $quantity, $unitPrice, $totalAmount, $poNumber, $poStatus, $notes, $deliveryMonth, $deliveryDay, $deliveryYear, $deliveryDate, $newCompany, $newStatus, $inquiryId, $owner_user_id);
+                $stmt->bind_param('ssssiddssssiisssi', $customer, $orderDate, $itemCode, $itemName, $quantity, $unitPrice, $totalAmount, $poNumber, $poStatus, $notes, $deliveryMonth, $deliveryDay, $deliveryYear, $deliveryDate, $newCompany, $newStatus, $inquiryId);
                 if ($stmt->execute()) {
                     $_SESSION['inquiry_detail_flash'] = ['type' => 'success', 'message' => 'Inquiry moved to Delivery Records!'];
                     $stmt->close();
-                    header('Location: ../delivery-records.php', true, 302);
+                    header('Location: delivery-records.php', true, 302);
                     exit;
                 } else {
                     $_SESSION['inquiry_detail_flash'] = ['type' => 'error', 'message' => 'Failed to move inquiry to delivery records.'];
@@ -141,14 +135,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                               quantity = ?, unit_price = ?, total_amount = ?, po_number = ?,
                               po_status = ?, notes = ?, delivery_month = ?,
                               delivery_day = ?, delivery_year = ?, delivery_date = ?, updated_at = CURRENT_TIMESTAMP
-                          WHERE id = ? AND company_name = 'Inquiry' AND owner_user_id = ?";
+                          WHERE id = ? AND company_name = 'Inquiry'";
             
             $stmt = $conn->prepare($updateSql);
             if ($stmt) {
-                $stmt->bind_param('ssssiddssssiisii',
+                $stmt->bind_param('ssssiddssssiisi',
                     $customer, $orderDate, $itemCode, $itemName, $quantity, $unitPrice, $totalAmount,
                     $poNumber, $poStatus, $notes, $deliveryMonth, $deliveryDay, $deliveryYear, $deliveryDate,
-                    $inquiryId, $owner_user_id
+                    $inquiryId
                 );
                 if ($stmt->execute()) {
                     $_SESSION['inquiry_detail_flash'] = ['type' => 'success', 'message' => 'Inquiry updated successfully.'];
@@ -172,10 +166,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: inquiry-details.php?id=' . $inquiryId, true, 302);
             exit;
         }
-        $deleteSql = "DELETE FROM delivery_records WHERE id = ? AND company_name = 'Inquiry' AND owner_user_id = ?";
+        $deleteSql = "DELETE FROM delivery_records WHERE id = ? AND company_name = 'Inquiry'";
         $stmt = $conn->prepare($deleteSql);
         if ($stmt) {
-            $stmt->bind_param('ii', $inquiryId, $owner_user_id);
+            $stmt->bind_param('i', $inquiryId);
             if ($stmt->execute()) {
                 $_SESSION['inquiry_detail_flash'] = ['type' => 'success', 'message' => 'Inquiry deleted.'];
                 $stmt->close();
@@ -190,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$autoEditMode = isset($_GET['edit']);
+$autoEditMode = isset($_GET['edit']) && $canEditInquiry;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -205,7 +199,7 @@ $autoEditMode = isset($_GET['edit']);
     <noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
     <nav class="navbar">
@@ -218,7 +212,7 @@ $autoEditMode = isset($_GET['edit']);
                 </button>
                 <div class="logo">
                     <a href="index.php" style="display:flex;align-items:center;">
-                        <img src="assets/logo.png" alt="Andison" style="height:48px;width:auto;object-fit:contain;">
+                        <img src="../assets/logo.png" alt="Andison" style="height:48px;width:auto;object-fit:contain;">
                     </a>
                 </div>
             </div>
@@ -236,7 +230,7 @@ $autoEditMode = isset($_GET['edit']);
                         <a href="settings.php"><i class="fas fa-cog"></i> Settings</a>
                         <a href="help.php"><i class="fas fa-question-circle"></i> Help</a>
                         <hr>
-                        <a href="logout.php" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        <a href="../logout.php" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>
             </div>
@@ -301,6 +295,7 @@ $autoEditMode = isset($_GET['edit']);
                     <div style="margin-bottom: 28px;">
                         <label style="display: block; margin-bottom: 10px; color: #7f8c8d; font-weight: 600; font-size: 12px; letter-spacing: 0.3px; text-transform: uppercase;">Notes</label>
                         <div style="padding: 11px 14px; background: #f8f9fa; border-radius: 8px; color: #2c3e50; font-size: 14px; min-height: 60px; line-height: 1.5;"><?php echo nl2br(h($inquiry['notes'])) ?: '—'; ?></div>
+                    </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <?php if ($canEditInquiry): ?>
                         <a href="inquiry-details.php?id=<?php echo $inquiryId; ?>&edit=1" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border-radius: 8px; background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%); border: none; color: #17324d; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s ease; text-decoration: none;" onmouseover="this.style.transform='translateY(-2px)';" onmouseout="this.style.transform='translateY(0)';">
