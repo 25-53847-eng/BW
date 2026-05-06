@@ -1,9 +1,22 @@
 <?php
+session_start();
 header('Content-Type: application/json');
 ini_set('display_errors', 0);
 
 // Include database configuration
 require_once __DIR__ . '/../db_config.php';
+
+// Check if user is authenticated
+if (empty($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Unauthorized: User not logged in'
+    ]);
+    exit;
+}
+
+$owner_user_id = intval($_SESSION['user_id']);
 
 // Get JSON data from request
 $json = file_get_contents('php://input');
@@ -70,18 +83,17 @@ try {
         if ($delivery_year == intval(date('Y'))) $delivery_year = intval(date('Y', $timestamp));
     }
     
-    // Build delivery_date if we have month, day, year but no date
-    if (empty($delivery_date) && !empty($delivery_month) && $delivery_day > 0 && $delivery_year > 0) {
-        $month_num = date('n', strtotime($delivery_month . ' 1'));
-        if ($month_num) {
-            $delivery_date = sprintf('%04d-%02d-%02d', $delivery_year, $month_num, $delivery_day);
-        }
+    // Auto-route to Andison Manila if sold_to is "Stock in Manila"
+    if (strtolower(trim($sold_to)) === 'stock in manila') {
+        // Update company_name and sold_to to route to Andison Manila view
+        $company_name = 'Andison Manila';
+        $sold_to = 'Andison Manila';
     }
     
     // Insert into database
     $sql = "INSERT INTO delivery_records 
-            (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, delivery_date, item_code, item_name, company_name, transferred_to, sold_to, quantity, unit_price, status, highlight_color, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, delivery_date, item_code, item_name, company_name, transferred_to, sold_to, quantity, unit_price, status, highlight_color, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name, owner_user_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
     
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -89,7 +101,7 @@ try {
     }
 
     $stmt->bind_param(
-        'sssiissssssidsssssiss',
+        'ssissssssssiidssssissi',
         $invoice_no,
         $serial_no,
         $delivery_month,
@@ -110,7 +122,8 @@ try {
         $sold_to_month,
         $sold_to_day,
         $groupings,
-        $dataset_name
+        $dataset_name,
+        $owner_user_id
     );
 
     if (!$stmt->execute()) {
@@ -128,6 +141,50 @@ try {
         }
     }
     $stmt->close();
+
+    // Deduct from inventory if this is a delivery (has sold_to or transferred_to)
+    if (($quantity > 0) && (!empty($sold_to) || !empty($transferred_to))) {
+        // Find the Stock Addition record for this item
+        $item_code_safe = $conn->real_escape_string($item_code);
+        
+        $stock_check = "SELECT id, quantity FROM delivery_records 
+                        WHERE item_code = ? 
+                        AND company_name = 'Stock Addition' 
+                        AND (COALESCE(sold_to, '') = '' AND COALESCE(transferred_to, '') = '')
+                        AND owner_user_id = ?
+                        LIMIT 1";
+        
+        $stock_stmt = $conn->prepare($stock_check);
+        if ($stock_stmt) {
+            $stock_stmt->bind_param('si', $item_code, $owner_user_id);
+            $stock_stmt->execute();
+            $stock_result = $stock_stmt->get_result();
+            
+            if ($stock_result && $stock_row = $stock_result->fetch_assoc()) {
+                $current_stock_qty = intval($stock_row['quantity']);
+                
+                // Check if there's enough stock to deliver
+                if ($quantity > $current_stock_qty) {
+                    throw new Exception("Insufficient stock for item '{$item_code}'. Available: {$current_stock_qty} units, Requested: {$quantity} units");
+                }
+                
+                // Deduct from inventory
+                $new_stock_qty = $current_stock_qty - $quantity;
+                
+                $stock_update = "UPDATE delivery_records 
+                                SET quantity = ?, updated_at = CURRENT_TIMESTAMP 
+                                WHERE id = ? AND owner_user_id = ?";
+                
+                $update_stmt = $conn->prepare($stock_update);
+                if ($update_stmt) {
+                    $update_stmt->bind_param('iii', $new_stock_qty, $stock_row['id'], $owner_user_id);
+                    $update_stmt->execute();
+                    $update_stmt->close();
+                }
+            }
+            $stock_stmt->close();
+        }
+    }
 
     echo json_encode([
         'success' => true,

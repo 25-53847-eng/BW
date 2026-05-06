@@ -657,6 +657,7 @@ if (($_SESSION['user_role'] ?? 'admin') !== 'admin') {
                         'Inquiry': { icon: 'fas fa-envelope', permissions: [] },
                         'Delivery Records': { icon: 'fas fa-truck', permissions: [] },
                         'Inventory': { icon: 'fas fa-boxes', permissions: [] },
+                        'Sales': { icon: 'fas fa-chart-line', permissions: [] },
                         'Purchase Orders': { icon: 'fas fa-shopping-cart', permissions: [] },
                         'Andison Manila': { icon: 'fas fa-building', permissions: [] },
                         'Warranty Items': { icon: 'fas fa-wrench', permissions: [] }
@@ -685,6 +686,12 @@ if (($_SESSION['user_role'] ?? 'admin') !== 'admin') {
                             groups['Purchase Orders'].permissions.push(perm);
                         } else if (perm.permission_name.startsWith('andison_')) {
                             groups['Andison Manila'].permissions.push(perm);
+                        } else if (perm.permission_name === 'sales_add_records') {
+                            // Add sales_add_records to both Sales and Andison Manila groups
+                            groups['Sales'].permissions.push(perm);
+                            groups['Andison Manila'].permissions.push(perm);
+                        } else if (perm.permission_name.startsWith('sales_')) {
+                            groups['Sales'].permissions.push(perm);
                         } else if (perm.permission_name.startsWith('warranty_')) {
                             groups['Warranty Items'].permissions.push(perm);
                         }

@@ -391,16 +391,23 @@ CREATE TABLE `sales` (
 --
 
 CREATE TABLE `users` (
-  `id` int(11) NOT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `name` varchar(255) NOT NULL,
-  `email` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL UNIQUE,
   `password` varchar(255) NOT NULL,
+  `role` varchar(50) DEFAULT 'user' NOT NULL,
   `two_factor_secret` varchar(32) DEFAULT NULL,
   `two_factor_enabled` tinyint(1) DEFAULT 0,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `profile_picture` varchar(500) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `users`
+--
+INSERT INTO `users` (`name`, `email`, `password`, `role`) VALUES
+('Angeli Uy Bomping', 'angeli.uybomping@andisonindustrial.com', '$2y$10$oGrEbuA7BCczhL0Mcfdz3u/7EkBpnPhoL2Y3A1zzo9iZxTkWEf.HC', 'admin');
 
 -- --------------------------------------------------------
 
@@ -905,6 +912,15 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 -- --------------------------------------------------------
 
 --
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `name`, `email`, `password`, `role`) VALUES
+(1, 'Angeli Uybomping', 'angeli.uybomping@andisonindustrial.com', '$2y$10$LHqN1LGS85CXzhXbuLY3YOLaMpFSkjSvE1.5KfjP4K0PyDiZsHQIe', 'admin');
+
+COMMIT;
+
+--
 -- Structure for view `warranty`
 --
 DROP TABLE IF EXISTS `warranty`;
@@ -985,7 +1001,7 @@ ALTER TABLE `delivery_records`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `user_settings`

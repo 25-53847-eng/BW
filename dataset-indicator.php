@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // Dataset indicator helper - include this in all pages to show active dataset
 // This should be included after session_start() and before any HTML output
 
@@ -28,3 +28,4 @@ function renderDatasetIndicator($dataset_name) {
     </div>
     ';
 }
+

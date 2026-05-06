@@ -574,6 +574,44 @@ if ($result) {
         body.light-mode .employee-email {
             color: #3a5a7a;
         }
+
+        /* Password Toggle Button */
+        .password-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-wrapper .form-input {
+            flex: 1;
+            padding-right: 40px;
+        }
+
+        .toggle-password-btn {
+            position: absolute;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #7a9dc5;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .toggle-password-btn:hover {
+            background: rgba(91, 188, 255, 0.1);
+            color: #5bbcff;
+        }
+
+        .toggle-password-btn:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body>
@@ -702,7 +740,12 @@ if ($result) {
 
                 <div class="form-group" id="passwordGroup">
                     <label class="form-label">Password</label>
-                    <input type="password" id="employeePassword" class="form-input" placeholder="Enter a strong password" required>
+                    <div class="password-wrapper">
+                        <input type="password" id="employeePassword" class="form-input" placeholder="Enter a strong password" required>
+                        <button type="button" class="toggle-password-btn" id="togglePasswordBtn" onclick="togglePasswordVisibility()" tabindex="-1" aria-label="Show/hide password">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
                     <small style="color: #7a9dc5; margin-top: 6px; display: block; font-size: 11px;">
                         Min 8 characters with uppercase, lowercase, numbers, and symbols
                     </small>
@@ -749,6 +792,24 @@ if ($result) {
 
     <script src="js/app.js"></script>
     <script>
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('employeePassword');
+            const toggleBtn = document.getElementById('togglePasswordBtn');
+            const icon = toggleBtn.querySelector('i');
+            
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+                toggleBtn.setAttribute('aria-label', 'Hide password');
+            } else {
+                passwordInput.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+                toggleBtn.setAttribute('aria-label', 'Show password');
+            }
+        }
+
         function openAddEmployeeModal() {
             document.getElementById('employeeId').value = '';
             document.getElementById('modalTitle').textContent = 'Add New Employee';
@@ -767,7 +828,15 @@ if ($result) {
             document.getElementById('employeeName').value = name;
             document.getElementById('employeeEmail').value = email;
             document.getElementById('employeePassword').value = '';
-            document.getElementById('passwordGroup').innerHTML = '<label class="form-label">New Password (Leave blank to keep current)</label><input type="password" id="employeePassword" class="form-input" placeholder="Optional - leave blank to keep current password">';
+            document.getElementById('passwordGroup').innerHTML = `
+                <label class="form-label">New Password (Leave blank to keep current)</label>
+                <div class="password-wrapper">
+                    <input type="password" id="employeePassword" class="form-input" placeholder="Optional - leave blank to keep current password">
+                    <button type="button" class="toggle-password-btn" id="togglePasswordBtn" onclick="togglePasswordVisibility()" tabindex="-1" aria-label="Show/hide password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            `;
             document.getElementById('submitBtnText').textContent = 'Update Employee';
             document.getElementById('employeeModal').classList.add('active');
         }

@@ -1,9 +1,5 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_role'])) {
-    $_SESSION['user_role'] = 'employee';
-}
-
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php', true, 302);
     exit;
@@ -252,7 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_order') {
     // Check permission before deleting order
     if (!$canDeleteOrder) {
-        $_SESSION['orders_flash'] = ['type' => 'error', 'message' => 'Permission denied. Admin has not granted you access to delete purchase orders.'];
+        $_SESSION['orders_flash'] = ['type' => 'error', 'message' => 'Permission denied. Admin has not granted you access to delete orders.'];
         header('Location: orders.php', true, 302);
         exit;
     }
@@ -803,9 +799,7 @@ if ($listResult) {
         <main class="main-content">
             <div class="page-header">
                 <h1 class="page-title"><i class="fas fa-file-invoice-dollar"></i> Orders / Sales Orders</h1>
-                <?php if ($canCreateOrder): ?>
                 <button class="action-btn" id="toggleCreateBtn"><i class="fas fa-plus"></i> Create Order</button>
-                <?php endif; ?>
             </div>
 
             <?php if ($flash): ?>

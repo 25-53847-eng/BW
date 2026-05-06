@@ -1,6 +1,6 @@
-<?php
+﻿<?php
 session_start();
-require_once __DIR__ . '/db_config.php';
+require_once __DIR__ . '/../db_config.php';
 
 $action = $_GET['action'] ?? '';
 $token = $_GET['token'] ?? '';
@@ -249,3 +249,4 @@ if ($token) {
     </div>
 </body>
 </html>
+

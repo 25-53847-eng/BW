@@ -110,10 +110,17 @@ try {
         }
     }
     
+    // Auto-route to Andison Manila if sold_to is "Stock in Manila"
+    if (strtolower(trim($sold_to)) === 'stock in manila') {
+        // Update company_name and sold_to to route to Andison Manila view
+        $company_name = 'Andison Manila';
+        $sold_to = 'Andison Manila';
+    }
+    
     // Insert into database
     $sql = "INSERT INTO delivery_records 
-            (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, delivery_date, item_code, item_name, company_name, transferred_to, sold_to, quantity, unit_price, status, highlight_color, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, delivery_date, item_code, item_name, company_name, transferred_to, sold_to, quantity, unit_price, status, highlight_color, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name, owner_user_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
     
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -121,7 +128,7 @@ try {
     }
 
     $stmt->bind_param(
-        'sssiissssssidsssssiss',
+        'ssissssssssiidssssissi',
         $invoice_no,
         $serial_no,
         $delivery_month,
@@ -142,7 +149,8 @@ try {
         $sold_to_month,
         $sold_to_day,
         $groupings,
-        $dataset_name
+        $dataset_name,
+        $_SESSION['user_id']
     );
 
     if (!$stmt->execute()) {
@@ -160,6 +168,48 @@ try {
         }
     }
     $stmt->close();
+
+    // Deduct from inventory if this is a delivery (has sold_to or transferred_to)
+    if (($quantity > 0) && (!empty($sold_to) || !empty($transferred_to))) {
+        // Find the Stock Addition record for this item
+        $stock_check = "SELECT id, quantity FROM delivery_records 
+                        WHERE item_code = ? 
+                        AND company_name = 'Stock Addition' 
+                        AND (COALESCE(sold_to, '') = '' AND COALESCE(transferred_to, '') = '')
+                        AND owner_user_id = ?
+                        LIMIT 1";
+        
+        $stock_stmt = $conn->prepare($stock_check);
+        if ($stock_stmt) {
+            $stock_stmt->bind_param('si', $item_code, $_SESSION['user_id']);
+            $stock_stmt->execute();
+            $stock_result = $stock_stmt->get_result();
+            
+            if ($stock_result && $stock_row = $stock_result->fetch_assoc()) {
+                $current_stock_qty = intval($stock_row['quantity']);
+                
+                // Check if there's enough stock to deliver
+                if ($quantity > $current_stock_qty) {
+                    throw new Exception("Insufficient stock for item '{$item_code}'. Available: {$current_stock_qty} units, Requested: {$quantity} units");
+                }
+                
+                // Deduct from inventory
+                $new_stock_qty = $current_stock_qty - $quantity;
+                
+                $stock_update = "UPDATE delivery_records 
+                                SET quantity = ?, updated_at = CURRENT_TIMESTAMP 
+                                WHERE id = ? AND owner_user_id = ?";
+                
+                $update_stmt = $conn->prepare($stock_update);
+                if ($update_stmt) {
+                    $update_stmt->bind_param('iii', $new_stock_qty, $stock_row['id'], $_SESSION['user_id']);
+                    $update_stmt->execute();
+                    $update_stmt->close();
+                }
+            }
+            $stock_stmt->close();
+        }
+    }
 
     echo json_encode([
         'success' => true,

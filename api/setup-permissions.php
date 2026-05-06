@@ -31,7 +31,9 @@ try {
         ['inventory_edit_item', 'Inventory (edit item)'],
         ['inventory_delete_item', 'Inventory (delete item)'],
         ['inventory_create_po', 'Purchase Orders (create/edit/delete purchase orders)'],
+        ['andison_add_inventory', 'Andison Manila (add inventory)'],
         ['andison_add_records', 'Andison Manila (add records)'],
+        ['sales_add_records', 'Sales (add records)'],
         ['warranty_manage_records', 'Warranty Items (add/edit/delete records)'],
         ['upload_data', 'Upload Data']
     ];

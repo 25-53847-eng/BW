@@ -1,24 +1,27 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_role'])) {
-    $_SESSION['user_role'] = 'employee';
-}
-
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php', true, 302);
     exit;
 }
 
 require_once 'db_config.php';
-require_once 'dataset-indicator.php';
 require_once '../api/permission-helper.php';
+
+// Include dataset indicator helper
+require_once 'dataset-indicator.php';
 require_once '../api/dataset-status-helper.php';
 
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
 
-// Check permission for adding andison manila records
+// Check permissions for adding records
 $canAddAndisonRecords = isPermissionEnabled('andison_add_records', $conn);
+$canAddAndisonInventory = isPermissionEnabled('andison_add_inventory', $conn);
+$canAddSalesRecords = isPermissionEnabled('sales_add_records', $conn);
+
+// Andison Manila records should be visible to all employees regardless of dataset
+$dataset_filter = "";
 
 // Get all deliveries to "to Andison Manila" with full details
 $companyName = 'to Andison Manila';
@@ -26,7 +29,7 @@ $delivery_records = [];
 $totalQuantity = 0;
 
 $result = $conn->query("
-    SELECT 
+    SELECT
         id,
         invoice_no,
         delivery_date,
@@ -45,13 +48,15 @@ $result = $conn->query("
         sold_to_day,
         notes as remarks,
         groupings,
-        status
+        status,
+        record_type
     FROM delivery_records
     WHERE (
         company_name = '{$companyName}'
         OR transferred_to = '{$companyName}'
-        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila')
-    )
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('stock in manila')
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) LIKE '%stock in manila%'
+    ){$dataset_filter}
     ORDER BY delivery_year DESC, delivery_month DESC, delivery_day DESC
 ");
 
@@ -71,12 +76,29 @@ $totalItemTypes = count($itemCodes);
 // Count records with a sold_to value
 $isRealSoldTo = function ($value) {
     $normalized = strtolower(trim((string) $value));
-    return $normalized !== '' && $normalized !== 'andison manila' && $normalized !== 'to andison manila';
+    return $normalized !== '' && $normalized !== 'andison manila' && $normalized !== 'to andison manila' && $normalized !== 'stock in manila' && $normalized !== 'andison manila use' && $normalized !== 'zamora use';
 };
 
 $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSoldTo) {
     return $isRealSoldTo($r['sold_to'] ?? '');
 }));
+
+// Get all unique client companies for dropdown
+$clientCompanies = [];
+$clientResult = $conn->query("
+    SELECT DISTINCT TRIM(sold_to) as company
+    FROM delivery_records
+    WHERE sold_to IS NOT NULL 
+    AND sold_to != ''
+    AND LOWER(TRIM(COALESCE(sold_to, ''))) NOT IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use', 'zamora use')
+    ORDER BY TRIM(sold_to) ASC
+");
+
+if ($clientResult) {
+    while ($row = $clientResult->fetch_assoc()) {
+        $clientCompanies[] = $row['company'];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -571,6 +593,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             align-items: flex-start;
             justify-content: center;
             padding: 20px;
+            padding-top: 70px;
         }
         body.modal-open { overflow: hidden; }
 
@@ -585,8 +608,8 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             margin-top: 20px;
         }
         .modal-content.modal-large {
-            max-width: 650px;
-            max-height: 70vh;
+            max-width: 750px;
+            max-height: 80vh;
             overflow-y: auto;
             box-sizing: border-box;
             margin: 100px 0 5px 0;
@@ -745,7 +768,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                         Andison Manila Deliveries
                     </div>
                     <div style="display:flex;gap:12px;align-items:center;">
-                        <?php if ($canAddAndisonRecords && $dataset_is_enabled): ?>
+                        <?php if ($dataset_is_enabled && $canAddAndisonRecords): ?>
                         <button class="btn-add-record" onclick="openAddModal()">
                             <i class="fas fa-plus"></i> Add Record
                         </button>
@@ -782,22 +805,18 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                 </div>
 
                 <!-- Filter Tabs -->
-                <div class="filter-tabs primary-filter-tabs" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-                    <button class="filter-tab active" id="tabAll" data-primary-filter="all" onclick="setPrimaryFilter('all')">All Records</button>
+                <div class="filter-tabs primary-filter-tabs" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+                    <button class="filter-tab active" id="tabAll" data-primary-filter="all" onclick="setPrimaryFilter('all')"><i class="fas fa-boxes" style="margin-right:5px;"></i>All Records</button>
+                    <button class="filter-tab" id="tabInventory" data-primary-filter="inventory" onclick="setPrimaryFilter('inventory')"><i class="fas fa-warehouse" style="margin-right:5px;"></i>Inventory</button>
                     <button class="filter-tab" id="tabSales" data-primary-filter="sales" onclick="setPrimaryFilter('sales')"><i class="fas fa-tag" style="margin-right:5px;"></i>Sales</button>
-                </div>
-
-                <div class="group-filter-row" id="groupFilterRow">
-                    <span class="group-filter-label"><i class="fas fa-filter"></i> Filter</span>
-                    <select id="groupingFilterSelect" class="group-filter-select" onchange="setGroupingFilter(this.value)">
-                        <option value="all">All</option>
-                        <option value="1a">1A</option>
-                        <option value="1b">1B</option>
-                        <option value="2a">2A</option>
-                        <option value="2b">2B</option>
-                        <option value="3a">3A</option>
-                        <option value="4a">4A</option>
-                    </select>
+                    <div style="margin-left:auto;">
+                        <button id="addInventoryBtn" class="btn-add-record" style="display:none;background:#27ae60;" onclick="openAddInventoryModal()">
+                            <i class="fas fa-plus"></i> Add Inventory
+                        </button>
+                        <button id="addSalesBtn" class="btn-add-record" style="display:none;" onclick="openAddSalesModal()">
+                            <i class="fas fa-plus"></i> Add Sales
+                        </button>
+                    </div>
                 </div>
 
                 <?php if ($totalDeliveries > 0): ?>
@@ -837,27 +856,28 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                         </thead>
                         <tbody>
                             <?php foreach ($delivery_records as $record):
+                                // Only use delivery_date from Excel import - don't construct dates
                                 $delivery_date = '';
-                                if (!empty($record['delivery_date'])) {
-                                    $delivery_date = date('M j, Y', strtotime($record['delivery_date']));
-                                }
-                                
                                 $date_col = '';
-                                if (!empty($record['delivery_date'])) {
+
+                                if (!empty($record['delivery_date']) && $record['delivery_date'] !== '0000-00-00') {
+                                    // Use delivery_date field directly from Excel
+                                    $delivery_date = date('M j, Y', strtotime($record['delivery_date']));
                                     $date_col = date('m/d/Y', strtotime($record['delivery_date']));
                                 }
-                                
+                                // If no valid delivery_date, leave date empty (don't construct from month/day/year)
+
                                 $sold_to_month = !empty($record['sold_to_month']) ? $record['sold_to_month'] : '';
                                 $sold_to_day = !empty($record['sold_to_day']) ? $record['sold_to_day'] : '';
 
                                 // Only treat real customer names as sold-to values.
                                 $row_sold_to = trim((string) ($record['sold_to'] ?? ''));
                                 $sold_to_normalized = strtolower($row_sold_to);
-                                if ($sold_to_normalized === 'andison manila' || $sold_to_normalized === 'to andison manila') {
+                                if ($sold_to_normalized === 'andison manila' || $sold_to_normalized === 'to andison manila' || $sold_to_normalized === 'stock in manila' || $sold_to_normalized === 'andison manila use' || $sold_to_normalized === 'zamora use') {
                                     $row_sold_to = '';
                                 }
                             ?>
-                            <tr data-soldto="<?php echo !empty($row_sold_to) ? '1' : '0'; ?>" data-grouping="<?php echo strtolower(trim((string) ($record['groupings'] ?? ''))); ?>">
+                            <tr data-recordtype="<?php echo htmlspecialchars($record['record_type'] ?? 'inventory'); ?>" data-soldto="<?php echo !empty($row_sold_to) ? '1' : '0'; ?>" data-grouping="<?php echo strtolower(trim((string) ($record['groupings'] ?? ''))); ?>">
                                 <td><?php echo htmlspecialchars($record['invoice_no'] ?? ''); ?></td>
                                 <td><?php echo htmlspecialchars($date_col); ?></td>
                                 <td><?php echo htmlspecialchars($record['delivery_month'] ?? ''); ?></td>
@@ -885,8 +905,10 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                                 <td style="text-align: center;">
                                     <div class="action-buttons">
                                         <a href="#" class="view-btn" onclick="openModal(event, <?php echo intval($record['id'] ?? 0); ?>)" title="View Record">View</a>
+                                        <?php if ($canAddAndisonRecords): ?>
                                         <a href="#" class="edit-btn" onclick="openEditModal(event, <?php echo intval($record['id'] ?? 0); ?>)" title="Edit Record"><i class="fas fa-edit"></i></a>
                                         <a href="#" class="delete-btn" onclick="deleteRecord(event, <?php echo intval($record['id'] ?? 0); ?>, '<?php echo htmlspecialchars($record['serial_no'] ?? ''); ?>')" title="Delete Record"><i class="fas fa-trash-alt"></i></a>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
@@ -951,11 +973,30 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="add_quantity">Qty.</label>
-                        <input type="number" id="add_quantity" name="quantity" placeholder="e.g., 40" min="0">
+                        <input type="number" id="add_quantity" name="quantity" placeholder="e.g., 40" min="0" step="0.01" onchange="calculateAddTotal(); calculateTotalRevenue();">
                     </div>
                     <div class="form-group">
                         <label for="add_uom">UOM</label>
                         <input type="text" id="add_uom" name="uom" placeholder="e.g., units, pcs">
+                    </div>
+                    <div class="form-group">
+                        <label for="add_unit_price">Unit Price</label>
+                        <input type="number" id="add_unit_price" name="unit_price" placeholder="e.g., 1500.00" min="0" step="0.01" onchange="calculateAddTotal();">
+                    </div>
+                    <div class="form-group">
+                        <label for="add_total_amount">Total Amount</label>
+                        <input type="number" id="add_total_amount" name="total_amount" placeholder="e.g., 60000.00" min="0" step="0.01" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
+                        <small class="input-hint" style="color: #888; font-size: 10px; margin-top: 2px;">Auto-calculated: Qty × Unit Price</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="add_selling_price">Selling Price</label>
+                        <input type="number" id="add_selling_price" name="selling_price" placeholder="e.g., 1800.00" min="0" step="0.01" onchange="calculateTotalRevenue()">
+                        <small class="input-hint">Price sold to customer</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="add_total_revenue">Total Revenue</label>
+                        <input type="number" id="add_total_revenue" name="total_revenue" placeholder="e.g., 72000.00" min="0" step="0.01" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
+                        <small class="input-hint" style="color: #888; font-size: 10px; margin-top: 2px;">Auto-calculated: Qty × Selling Price</small>
                     </div>
                     <div class="form-group">
                         <label for="add_serial_no">Serial No.</label>
@@ -968,7 +1009,16 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="add_sold_to">Sold To</label>
-                        <input type="text" id="add_sold_to" name="sold_to" placeholder="e.g., ABC Company Ltd">
+                        <select id="add_sold_to" name="sold_to" style="background:#f39c12;color:#fff;font-weight:600;">
+                            <option value="">-- Select a customer --</option>
+                            <?php foreach ($clientCompanies as $company): ?>
+                            <option value="<?php echo htmlspecialchars($company); ?>">
+                                <?php echo htmlspecialchars($company); ?>
+                            </option>
+                            <?php endforeach; ?>
+                            <option value="__NEW__" style="background:#666;color:#ccc;">+ Add New Customer</option>
+                        </select>
+                        <input type="text" id="add_sold_to_new" name="sold_to_new" placeholder="Enter new customer name" style="display:none;margin-top:8px;">
                         <small class="input-hint">Customer/company buying from Andison Manila</small>
                     </div>
                     <div class="form-group">
@@ -1184,11 +1234,20 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="edit_quantity">Qty.</label>
-                        <input type="number" id="edit_quantity" name="quantity" placeholder="e.g., 40" min="0">
+                        <input type="number" id="edit_quantity" name="quantity" placeholder="e.g., 40" min="0" step="0.01" onchange="calculateEditTotal()">
                     </div>
                     <div class="form-group">
                         <label for="edit_uom">UOM</label>
                         <input type="text" id="edit_uom" name="uom" placeholder="e.g., units, pcs">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_unit_price">Unit Price</label>
+                        <input type="number" id="edit_unit_price" name="unit_price" placeholder="e.g., 1500.00" min="0" step="0.01" onchange="calculateEditTotal()">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_total_amount">Total Amount</label>
+                        <input type="number" id="edit_total_amount" name="total_amount" placeholder="e.g., 60000.00" min="0" step="0.01" readonly style="background: rgba(255,255,255,0.05); cursor: not-allowed;">
+                        <small class="input-hint" style="color: #888; font-size: 10px; margin-top: 2px;">Auto-calculated: Qty × Unit Price</small>
                     </div>
                     <div class="form-group">
                         <label for="edit_serial_no">Serial No.</label>
@@ -1201,7 +1260,16 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="edit_sold_to">Sold To</label>
-                        <input type="text" id="edit_sold_to" name="sold_to" placeholder="e.g., ABC Company Ltd">
+                        <select id="edit_sold_to" name="sold_to" style="background:#f39c12;color:#fff;font-weight:600;">
+                            <option value="">-- Select a customer --</option>
+                            <?php foreach ($clientCompanies as $company): ?>
+                            <option value="<?php echo htmlspecialchars($company); ?>">
+                                <?php echo htmlspecialchars($company); ?>
+                            </option>
+                            <?php endforeach; ?>
+                            <option value="__NEW__" style="background:#666;color:#ccc;">+ Add New Customer</option>
+                        </select>
+                        <input type="text" id="edit_sold_to_new" name="sold_to_new" placeholder="Enter new customer name" style="display:none;margin-top:8px;">
                         <small class="input-hint">Customer/company buying from Andison Manila</small>
                     </div>
                     <div class="form-group">
@@ -1271,14 +1339,158 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
         </div>
     </div>
 
+    <!-- Add Sales Modal -->
+    <div id="addSalesModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header" style="margin-bottom:18px;padding-bottom:12px;">
+                <h2><i class="fas fa-shopping-cart" style="color:#27ae60;margin-right:10px;"></i>Add Sale</h2>
+                <button class="close-btn" onclick="closeAddSalesModal()">&times;</button>
+            </div>
+            <form id="addSalesForm" onsubmit="submitAddSales(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="sales_inventory_id">Select Inventory Item *</label>
+                        <select id="sales_inventory_id" name="inventory_id" required style="background:#f39c12;color:#fff;font-weight:600;">
+                            <option value="">-- Choose an item --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="sales_quantity">Quantity Sold *</label>
+                        <input type="number" id="sales_quantity" name="quantity" min="1" required placeholder="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="sales_sold_to">Customer / Sold To *</label>
+                        <select id="sales_sold_to" name="sold_to" required style="background:#f39c12;color:#fff;font-weight:600;">
+                            <option value="">-- Select a customer --</option>
+                            <?php foreach ($clientCompanies as $company): ?>
+                            <option value="<?php echo htmlspecialchars($company); ?>">
+                                <?php echo htmlspecialchars($company); ?>
+                            </option>
+                            <?php endforeach; ?>
+                            <option value="__NEW__" style="background:#666;color:#ccc;">+ Add New Customer</option>
+                        </select>
+                        <input type="text" id="sales_sold_to_new" name="sold_to_new" placeholder="Enter new customer name" style="display:none;margin-top:8px;">
+                    </div>
+                    <div class="form-group">
+                        <label for="sales_sold_to_month">Month</label>
+                        <input type="text" id="sales_sold_to_month" name="sold_to_month" placeholder="e.g., January">
+                    </div>
+                    <div class="form-group">
+                        <label for="sales_sold_to_day">Day</label>
+                        <input type="number" id="sales_sold_to_day" name="sold_to_day" min="1" max="31" placeholder="1-31">
+                    </div>
+                    <div class="form-group">
+                        <label for="sales_delivery_date">Date Sold</label>
+                        <input type="date" id="sales_delivery_date" name="delivery_date">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="sales_notes">Remarks</label>
+                        <textarea id="sales_notes" name="notes" rows="3" placeholder="Additional notes..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel-form" onclick="closeAddSalesModal()">Cancel</button>
+                    <button type="submit" class="btn-submit"><i class="fas fa-save"></i> Record Sale</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Inventory Modal -->
+    <div id="addInventoryModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header" style="margin-bottom:18px;padding-bottom:12px;">
+                <h2><i class="fas fa-plus-circle" style="color:#27ae60;margin-right:10px;"></i>Add Inventory Item</h2>
+                <button class="close-btn" onclick="closeAddInventoryModal()">&times;</button>
+            </div>
+            <form id="addInventoryForm" onsubmit="submitAddInventory(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="inv_invoice_no">Invoice Number *</label>
+                        <input type="text" id="inv_invoice_no" name="invoice_no" required placeholder="e.g., SO#264274283">
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_item_code">Item Code</label>
+                        <input type="text" id="inv_item_code" name="item_code" placeholder="e.g., IU-BAT">
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_item_name">Item Name *</label>
+                        <input type="text" id="inv_item_name" name="item_name" required placeholder="e.g., Replacement Battery Pack for Ultra">
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_serial_no">Serial Number *</label>
+                        <input type="text" id="inv_serial_no" name="serial_no" required placeholder="e.g., 5220ULB01254500074">
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_quantity">Quantity</label>
+                        <input type="number" id="inv_quantity" name="quantity" min="1" value="1" placeholder="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_uom">Unit of Measure</label>
+                        <input type="text" id="inv_uom" name="uom" placeholder="e.g., pc., units">
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_delivery_date">Date Sent to Andison Manila *</label>
+                        <input type="date" id="inv_delivery_date" name="delivery_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_delivery_month">Month</label>
+                        <select id="inv_delivery_month" name="delivery_month">
+                            <option value="">Select Month...</option>
+                            <option value="January">January</option><option value="February">February</option>
+                            <option value="March">March</option><option value="April">April</option>
+                            <option value="May">May</option><option value="June">June</option>
+                            <option value="July">July</option><option value="August">August</option>
+                            <option value="September">September</option><option value="October">October</option>
+                            <option value="November">November</option><option value="December">December</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="inv_delivery_day">Day</label>
+                        <input type="number" id="inv_delivery_day" name="delivery_day" min="1" max="31" placeholder="1-31">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="inv_notes">Remarks</label>
+                        <textarea id="inv_notes" name="notes" rows="3" placeholder="Additional notes..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-cancel-form" onclick="closeAddInventoryModal()">Cancel</button>
+                    <button type="submit" class="btn-submit" style="background:#27ae60;"><i class="fas fa-save"></i> Add Inventory</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="js/app.js" defer></script>
     <script>
         // Records data from PHP for modals
         let recordsData = <?php echo json_encode($delivery_records); ?>;
 
+        // Check for filter parameter in URL on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+            const filterParam = params.get('filter');
+            console.log('Page loaded with filter parameter:', filterParam);
+            
+            if (filterParam && ['all', 'inventory', 'sales'].includes(filterParam)) {
+                // Wait for DOM to be fully ready, then activate the tab
+                setTimeout(() => {
+                    const tabId = 'tab' + filterParam.charAt(0).toUpperCase() + filterParam.slice(1);
+                    const filterButton = document.getElementById(tabId);
+                    console.log('Looking for tab:', tabId, 'Found:', filterButton ? 'Yes' : 'No');
+                    
+                    if (filterButton) {
+                        console.log('Clicking tab:', tabId);
+                        filterButton.click();
+                    }
+                }, 200);
+            }
+        });
+
         function isRealSoldToValue(value) {
             const normalized = String(value || '').trim().toLowerCase();
-            return normalized !== '' && normalized !== 'andison manila' && normalized !== 'to andison manila';
+            return normalized !== '' && normalized !== 'andison manila' && normalized !== 'to andison manila' && normalized !== 'stock in manila' && normalized !== 'andison manila use' && normalized !== 'zamora use';
         }
 
         function formatNumber(n) {
@@ -1359,6 +1571,24 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             document.getElementById('add_delivery_date').value = new Date().toISOString().split('T')[0];
             document.getElementById('add_highlight_preset').value = '';
             document.getElementById('add_highlight_color').style.display = 'none';
+            
+            // Reset customer dropdown and text input
+            const customerSelect = document.getElementById('add_sold_to');
+            const customerNewInput = document.getElementById('add_sold_to_new');
+            customerSelect.value = '';
+            customerNewInput.value = '';
+            customerNewInput.style.display = 'none';
+            
+            // Add event listener to dropdown
+            customerSelect.addEventListener('change', function() {
+                if (this.value === '__NEW__') {
+                    customerNewInput.style.display = 'block';
+                    customerNewInput.required = true;
+                } else {
+                    customerNewInput.style.display = 'none';
+                    customerNewInput.required = false;
+                }
+            });
         }
 
         function closeAddModal() {
@@ -1378,9 +1608,47 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             document.getElementById('edit_highlight_color').style.display = (preset === 'custom') ? 'block' : 'none';
         }
 
+        // Auto-calculate total amount for Add Record
+        function calculateAddTotal() {
+            const qty = parseFloat(document.getElementById('add_quantity').value) || 0;
+            const price = parseFloat(document.getElementById('add_unit_price').value) || 0;
+            const total = qty * price;
+            document.getElementById('add_total_amount').value = total > 0 ? total.toFixed(2) : '';
+        }
+
+        // Auto-calculate total amount for Edit Record
+        function calculateEditTotal() {
+            const qty = parseFloat(document.getElementById('edit_quantity').value) || 0;
+            const price = parseFloat(document.getElementById('edit_unit_price').value) || 0;
+            const total = qty * price;
+            document.getElementById('edit_total_amount').value = total > 0 ? total.toFixed(2) : '';
+        }
+
+        // Auto-calculate total revenue
+        function calculateTotalRevenue() {
+            const qty = parseFloat(document.getElementById('add_quantity').value) || 0;
+            const sellingPrice = parseFloat(document.getElementById('add_selling_price').value) || 0;
+            const revenue = qty * sellingPrice;
+            document.getElementById('add_total_revenue').value = revenue > 0 ? revenue.toFixed(2) : '';
+        }
+
         function submitAddRecord(event) {
             event.preventDefault();
             showLoadingOverlay(true, 'Saving');
+
+            // Get customer name - either from dropdown or new customer input
+            let soldToValue = '';
+            const customerSelect = document.getElementById('add_sold_to');
+            if (customerSelect.value === '__NEW__') {
+                soldToValue = document.getElementById('add_sold_to_new').value.trim();
+                if (!soldToValue) {
+                    showToast('Please enter a new customer name', 'error');
+                    showLoadingOverlay(false);
+                    return;
+                }
+            } else {
+                soldToValue = customerSelect.value;
+            }
 
             const formData = {
                 invoice_no:     document.getElementById('add_invoice_no').value,
@@ -1392,10 +1660,14 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                 item_name:      document.getElementById('add_item_name').value,
                 quantity:       parseInt(document.getElementById('add_quantity').value) || 0,
                 uom:            document.getElementById('add_uom').value,
+                unit_price:     parseFloat(document.getElementById('add_unit_price').value) || 0,
+                total_amount:   parseFloat(document.getElementById('add_total_amount').value) || 0,
+                selling_price:  parseFloat(document.getElementById('add_selling_price').value) || 0,
+                total_revenue:  parseFloat(document.getElementById('add_total_revenue').value) || 0,
                 serial_no:      document.getElementById('add_serial_no').value,
                 company_name:   document.getElementById('add_company_name').value,
                 transferred_to: document.getElementById('add_transferred_to').value,
-                sold_to:        document.getElementById('add_sold_to').value,
+                sold_to:        soldToValue,
                 delivery_date:  document.getElementById('add_delivery_date').value,
                 sold_to_month:  document.getElementById('add_sold_to_month').value,
                 sold_to_day:    parseInt(document.getElementById('add_sold_to_day').value) || 0,
@@ -1443,11 +1715,14 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
 
             let dateCol = '';
             let deliveryDate = '';
-            if (record.delivery_date) {
+
+            // Only use delivery_date from Excel import
+            if (record.delivery_date && record.delivery_date !== '0000-00-00') {
                 const d = new Date(record.delivery_date);
                 dateCol = d.toLocaleDateString('en-US');
                 deliveryDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             }
+            // If no valid delivery_date, leave empty (don't construct from month/day/year)
 
             document.getElementById('modalTrackingId').textContent = record.serial_no ? record.serial_no + ' Details' : 'Delivery Details';
             document.getElementById('modalInvoiceNo').textContent  = record.invoice_no || '';
@@ -1559,8 +1834,42 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             document.getElementById('edit_item_name').value     = record.item_name || '';
             // Always show "to Andison Manila" in the Transferred field
             document.getElementById('edit_company_name').value  = 'to Andison Manila';
+            
+            // Handle sold_to dropdown - check if it's an existing customer or a new one
             const actualSoldTo = isRealSoldToValue(record.sold_to) ? record.sold_to : '';
-            document.getElementById('edit_sold_to').value       = actualSoldTo;
+            const customerSelect = document.getElementById('edit_sold_to');
+            const customerNewInput = document.getElementById('edit_sold_to_new');
+            
+            if (actualSoldTo) {
+                // Check if the value exists in the dropdown options
+                const optionExists = Array.from(customerSelect.options).some(opt => opt.value === actualSoldTo);
+                if (optionExists) {
+                    customerSelect.value = actualSoldTo;
+                    customerNewInput.style.display = 'none';
+                    customerNewInput.value = '';
+                } else {
+                    // New customer not in the list
+                    customerSelect.value = '__NEW__';
+                    customerNewInput.style.display = 'block';
+                    customerNewInput.value = actualSoldTo;
+                }
+            } else {
+                customerSelect.value = '';
+                customerNewInput.style.display = 'none';
+                customerNewInput.value = '';
+            }
+            
+            // Add event listener to dropdown
+            customerSelect.addEventListener('change', function() {
+                if (this.value === '__NEW__') {
+                    customerNewInput.style.display = 'block';
+                    customerNewInput.required = true;
+                } else {
+                    customerNewInput.style.display = 'none';
+                    customerNewInput.required = false;
+                }
+            });
+            
             document.getElementById('edit_quantity').value      = record.quantity || '';
             document.getElementById('edit_uom').value           = record.uom || '';
             document.getElementById('edit_notes').value         = record.remarks || '';
@@ -1605,6 +1914,20 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             event.preventDefault();
             showLoadingOverlay(true, 'Updating');
 
+            // Get customer name - either from dropdown or new customer input
+            let soldToValue = '';
+            const customerSelect = document.getElementById('edit_sold_to');
+            if (customerSelect.value === '__NEW__') {
+                soldToValue = document.getElementById('edit_sold_to_new').value.trim();
+                if (!soldToValue) {
+                    showToast('Please enter a new customer name', 'error');
+                    showLoadingOverlay(false);
+                    return;
+                }
+            } else {
+                soldToValue = customerSelect.value;
+            }
+
             const formData = {
                 id:             document.getElementById('edit_id').value,
                 serial_no:      document.getElementById('edit_serial_no').value,
@@ -1613,7 +1936,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                 item_name:      document.getElementById('edit_item_name').value,
                 company_name:   'to Andison Manila',
                 transferred_to: '',
-                sold_to:        document.getElementById('edit_sold_to').value,
+                sold_to:        soldToValue,
                 quantity:       parseInt(document.getElementById('edit_quantity').value) || 0,
                 uom:            document.getElementById('edit_uom').value,
                 date:           document.getElementById('edit_date').value,
@@ -1659,9 +1982,219 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             if (e.target === document.getElementById('editRecordModal')) closeEditModal();
         });
 
+        // ===== ADD SALES MODAL =====
+        function openAddSalesModal() {
+            document.getElementById('addSalesModal').classList.add('show');
+            document.body.classList.add('modal-open');
+            
+            // Populate inventory items dropdown (items with no sold_to)
+            const inventorySelect = document.getElementById('sales_inventory_id');
+            inventorySelect.innerHTML = '<option value="">-- Choose an item --</option>';
+            
+            const inventoryItems = recordsData.filter(r => {
+                const sold_to = String(r.sold_to || '').trim().toLowerCase();
+                return sold_to === '' || sold_to === 'andison manila' || sold_to === 'to andison manila' || sold_to === 'stock in manila' || sold_to === 'andison manila use';
+            });
+            
+            inventoryItems.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = `${item.item_code} - ${item.item_name} (Serial: ${item.serial_no}, Qty: ${item.quantity})`;
+                inventorySelect.appendChild(option);
+            });
+            
+            // Reset customer dropdown and text input
+            const customerSelect = document.getElementById('sales_sold_to');
+            const customerNewInput = document.getElementById('sales_sold_to_new');
+            customerSelect.value = '';
+            customerNewInput.value = '';
+            customerNewInput.style.display = 'none';
+            customerSelect.required = true;
+            
+            // Add event listener to dropdown
+            customerSelect.addEventListener('change', function() {
+                if (this.value === '__NEW__') {
+                    customerNewInput.style.display = 'block';
+                    customerNewInput.required = true;
+                    this.required = false;
+                } else {
+                    customerNewInput.style.display = 'none';
+                    customerNewInput.required = false;
+                    this.required = true;
+                }
+            });
+            
+            // Set default date to today
+            document.getElementById('sales_delivery_date').value = new Date().toISOString().split('T')[0];
+        }
+
+        function closeAddSalesModal() {
+            document.getElementById('addSalesModal').classList.remove('show');
+            document.body.classList.remove('modal-open');
+            document.getElementById('addSalesForm').reset();
+        }
+
+        function submitAddSales(event) {
+            event.preventDefault();
+            showLoadingOverlay(true, 'Recording Sale');
+
+            const inventoryId = document.getElementById('sales_inventory_id').value;
+            const inventoryItem = recordsData.find(r => r.id == inventoryId);
+            
+            if (!inventoryItem) {
+                showToast('Please select a valid inventory item', 'error');
+                showLoadingOverlay(false);
+                return;
+            }
+
+            const quantity = parseInt(document.getElementById('sales_quantity').value) || 0;
+            if (quantity <= 0) {
+                showToast('Quantity must be greater than 0', 'error');
+                showLoadingOverlay(false);
+                return;
+            }
+
+            if (quantity > inventoryItem.quantity) {
+                showToast(`Cannot sell ${quantity} units. Only ${inventoryItem.quantity} available.`, 'error');
+                showLoadingOverlay(false);
+                return;
+            }
+
+            // Get customer name - either from dropdown or new customer input
+            let soldToValue = '';
+            const customerSelect = document.getElementById('sales_sold_to');
+            if (customerSelect.value === '__NEW__') {
+                soldToValue = document.getElementById('sales_sold_to_new').value.trim();
+                if (!soldToValue) {
+                    showToast('Please enter a new customer name', 'error');
+                    showLoadingOverlay(false);
+                    return;
+                }
+            } else {
+                soldToValue = customerSelect.value;
+                if (!soldToValue) {
+                    showToast('Please select or enter a customer', 'error');
+                    showLoadingOverlay(false);
+                    return;
+                }
+            }
+
+            const formData = {
+                inventory_id:    inventoryId,
+                quantity:        quantity,
+                sold_to:         soldToValue,
+                sold_to_month:   document.getElementById('sales_sold_to_month').value,
+                sold_to_day:     parseInt(document.getElementById('sales_sold_to_day').value) || 0,
+                delivery_date:   document.getElementById('sales_delivery_date').value,
+                notes:           document.getElementById('sales_notes').value
+            };
+
+            // DEBUG: Log data being sent
+            console.log('ADD-SALE DEBUG: Sending formData:', formData);
+            
+            fetch('api/add-sale.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(r => {
+                console.log('ADD-SALE DEBUG: Response status:', r.status);
+                return r.json();
+            })
+            .then(result => {
+                console.log('ADD-SALE DEBUG: API Response:', result);
+                showLoadingOverlay(false);
+                if (result.success) {
+                    showToast('Sale recorded successfully!', 'success');
+                    closeAddSalesModal();
+                    // Reload page with filter=sales to show the new sale immediately
+                    setTimeout(() => {
+                        // Preserve dataset parameter if it exists
+                        const params = new URLSearchParams(window.location.search);
+                        const datasetParam = params.get('dataset');
+                        let redirectUrl = window.location.pathname + '?filter=sales';
+                        if (datasetParam) {
+                            redirectUrl += '&dataset=' + encodeURIComponent(datasetParam);
+                        }
+                        console.log('Redirecting to:', redirectUrl);
+                        window.location.href = redirectUrl;
+                    }, 1200);
+                } else {
+                    showToast('Error: ' + (result.message || 'Failed to record sale'), 'error');
+                }
+            })
+            .catch(err => {
+                console.log('ADD-SALE DEBUG: Fetch error:', err);
+                showLoadingOverlay(false);
+                showToast('Error recording sale. Please try again.', 'error');
+            });
+        }
+
+        window.addEventListener('click', e => {
+            if (e.target === document.getElementById('addSalesModal')) closeAddSalesModal();
+        });
+
+        // ===== ADD INVENTORY MODAL =====
+        function openAddInventoryModal() {
+            document.getElementById('addInventoryModal').classList.add('show');
+            document.body.classList.add('modal-open');
+            document.getElementById('inv_delivery_date').value = new Date().toISOString().split('T')[0];
+        }
+
+        function closeAddInventoryModal() {
+            document.getElementById('addInventoryModal').classList.remove('show');
+            document.body.classList.remove('modal-open');
+            document.getElementById('addInventoryForm').reset();
+        }
+
+        function submitAddInventory(event) {
+            event.preventDefault();
+            showLoadingOverlay(true, 'Adding Inventory');
+
+            const formData = {
+                invoice_no:     document.getElementById('inv_invoice_no').value,
+                item_code:      document.getElementById('inv_item_code').value,
+                item_name:      document.getElementById('inv_item_name').value,
+                serial_no:      document.getElementById('inv_serial_no').value,
+                quantity:       parseInt(document.getElementById('inv_quantity').value) || 1,
+                uom:            document.getElementById('inv_uom').value,
+                delivery_date:  document.getElementById('inv_delivery_date').value,
+                delivery_month: document.getElementById('inv_delivery_month').value,
+                delivery_day:   parseInt(document.getElementById('inv_delivery_day').value) || 0,
+                company_name:   'to Andison Manila',
+                transferred_to: 'to Andison Manila',
+                notes:          document.getElementById('inv_notes').value,
+                status:         'Delivered'
+            };
+
+            fetch('api/add-record.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(result => {
+                showLoadingOverlay(false);
+                if (result.success) {
+                    showToast('Inventory item added successfully!', 'success');
+                    closeAddInventoryModal();
+                    setTimeout(() => window.location.reload(), 1200);
+                } else {
+                    showToast('Error: ' + (result.message || 'Failed to add inventory'), 'error');
+                }
+            })
+            .catch(err => {
+                showLoadingOverlay(false);
+                showToast('Error adding inventory. Please try again.', 'error');
+            });
+        }
+
+        window.addEventListener('click', e => {
+            if (e.target === document.getElementById('addInventoryModal')) closeAddInventoryModal();
+        });
+
         // ===== FILTER TABS =====
         let primaryFilter = 'all';
-        let groupingFilter = 'all';
 
         function setPrimaryFilter(filter) {
             primaryFilter = filter;
@@ -1669,18 +2202,35 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                 button.classList.toggle('active', button.dataset.primaryFilter === filter);
             });
 
+            // Show/hide Add Inventory button based on filter and permission
+            const addInventoryBtn = document.getElementById('addInventoryBtn');
+            const canAddInventory = <?php echo json_encode($canAddAndisonInventory); ?>;
+            if (addInventoryBtn) {
+                addInventoryBtn.style.display = (filter === 'inventory' && canAddInventory) ? 'inline-flex' : 'none';
+            }
+
+            // Show/hide Add Sales button based on filter and permission
+            const addSalesBtn = document.getElementById('addSalesBtn');
+            const canAddSales = <?php echo json_encode($canAddSalesRecords); ?>;
+            if (addSalesBtn) {
+                addSalesBtn.style.display = (filter === 'sales' && canAddSales) ? 'inline-flex' : 'none';
+            }
+
             // Reset free-text search when returning to All so rows are not accidentally hidden.
             if (filter === 'all') {
                 const searchInput = document.getElementById('searchInput');
                 if (searchInput) searchInput.value = '';
             }
 
-            searchTable();
+            // Re-initialize grouping after filter change
+            setTimeout(() => {
+                initializeInvoiceGrouping();
+                searchTable();
+            }, 50);
         }
 
         function setGroupingFilter(filter) {
-            groupingFilter = String(filter || 'all').toLowerCase();
-            searchTable();
+            // Grouping filter removed - all records shown separately
         }
 
         // ===== SEARCH =====
@@ -1689,37 +2239,51 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             const filter = searchInput ? searchInput.value.toLowerCase().trim() : '';
             const rows = Array.from(document.querySelectorAll('table tbody tr'));
             let count = 0;
-            const hasGroupingFilter = groupingFilter !== 'all';
+
             rows.forEach(row => {
                 const text = row.textContent.toLowerCase();
                 const textMatch = filter === '' || text.includes(filter);
-                const rowIsSales = row.dataset.soldto === '1';
-                const primaryMatch = primaryFilter === 'sales' ? rowIsSales : !rowIsSales;
-                const categoryMatch = !hasGroupingFilter
-                    || (row.dataset.grouping || '').trim().toLowerCase() === groupingFilter;
-                const match = textMatch && primaryMatch && categoryMatch;
-                row.style.display = match ? '' : 'none';
-                if (match) count++;
+                const recordType = row.dataset.recordtype || 'inventory';
+                
+                let primaryMatch = true;
+                if (primaryFilter === 'sales') {
+                    primaryMatch = recordType === 'sales';
+                } else if (primaryFilter === 'inventory') {
+                    primaryMatch = recordType === 'inventory';
+                }
+                // 'all' filter shows everything
+                
+                const match = textMatch && primaryMatch;
+                
+                if (match) {
+                    row.style.display = '';
+                    count++;
+                } else {
+                    row.style.display = 'none';
+                }
             });
-            const primaryTotal = rows.filter(row => {
-                const rowIsSales = row.dataset.soldto === '1';
-                const primaryMatch = primaryFilter === 'sales' ? rowIsSales : !rowIsSales;
-                const categoryMatch = !hasGroupingFilter
-                    || (row.dataset.grouping || '').trim().toLowerCase() === groupingFilter;
-                return primaryMatch && categoryMatch;
-            }).length;
+
             const countEl = document.getElementById('searchCount');
             if (countEl) {
-                const modeLabel = primaryFilter === 'sales' ? 'sales' : 'all records';
-                const groupLabel = hasGroupingFilter ? ` (${groupingFilter.toUpperCase()})` : '';
+                let modeLabel = 'all records';
+                if (primaryFilter === 'sales') modeLabel = 'sales';
+                else if (primaryFilter === 'inventory') modeLabel = 'inventory items';
+                
                 countEl.textContent = filter
-                    ? `Showing ${count} of ${primaryTotal} ${modeLabel}${groupLabel}`
-                    : `Showing ${primaryTotal} ${modeLabel}${groupLabel}`;
-                countEl.style.color = (filter || hasGroupingFilter || primaryFilter === 'sales') ? '#0066cc' : '#666';
+                    ? `Showing ${count} of ${rows.length} ${modeLabel}`
+                    : `Showing ${count} ${modeLabel}`;
+                countEl.style.color = (filter || primaryFilter !== 'all') ? '#0066cc' : '#666';
             }
         }
 
-        // Apply default tab logic on initial load.
+        // ===== INVOICE GROUPING FOR INVENTORY =====
+        function initializeInvoiceGrouping() {
+            // Invoice grouping disabled - show all records without collapsing
+            return;
+        }
+
+        // Apply default tab logic on initial load
+        initializeInvoiceGrouping();
         searchTable();
 
         // ===== TOAST =====
@@ -1827,6 +2391,22 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                 transform: scale(1);
                 opacity: 1;
             }
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .expand-btn:hover {
+            background: rgba(0, 102, 204, 0.1) !important;
+            color: #0066cc !important;
         }
         
         #gearLoaderContainer {

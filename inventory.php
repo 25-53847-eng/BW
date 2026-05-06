@@ -13,6 +13,71 @@ require_once 'api/dataset-status-helper.php';
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
 
+// Check permission for inventory operations
+$canAddInventory = isPermissionEnabled('inventory_add_item', $conn);
+
+// Handle inventory update
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_inventory') {
+    if (!isPermissionEnabled('inventory_edit_item', $conn)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'message' => 'Permission denied']);
+        exit;
+    }
+    
+    $item_code = isset($_POST['item_code']) ? trim($_POST['item_code']) : '';
+    $new_quantity = isset($_POST['new_quantity']) ? intval($_POST['new_quantity']) : 0;
+    
+    if (empty($item_code)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Item code is required']);
+        exit;
+    }
+    
+    if ($new_quantity < 0) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => 'Quantity cannot be negative']);
+        exit;
+    }
+    
+    // Get item details from delivery_records
+    $itemName = '';
+    $itemNameResult = $conn->query("SELECT DISTINCT item_name FROM delivery_records WHERE item_code = '{$conn->real_escape_string($item_code)}' LIMIT 1");
+    if ($itemNameResult && $itemNameResult->num_rows > 0) {
+        $nameRow = $itemNameResult->fetch_assoc();
+        $itemName = $nameRow['item_name'] ?? '';
+    }
+    
+    // Get the actual inventory record ID from delivery_records (where company_name = 'Stock Addition')
+    $checkResult = $conn->query("
+        SELECT id FROM delivery_records 
+        WHERE item_code = '{$conn->real_escape_string($item_code)}' 
+        AND company_name = 'Stock Addition'
+        AND owner_user_id = {$owner_user_id}
+        LIMIT 1
+    ");
+    
+    if ($checkResult && $checkResult->num_rows > 0) {
+        // Update existing inventory record in delivery_records
+        $recordRow = $checkResult->fetch_assoc();
+        $record_id = intval($recordRow['id']);
+        $updateQuery = "UPDATE delivery_records SET quantity = $new_quantity, updated_at = CURRENT_TIMESTAMP WHERE id = {$record_id}";
+    } else {
+        // Insert new inventory record (Stock Addition) in delivery_records
+        $itemNameEscape = $conn->real_escape_string($itemName);
+        $itemCodeEscape = $conn->real_escape_string($item_code);
+        $updateQuery = "INSERT INTO delivery_records (item_code, item_name, quantity, company_name, status, created_at, updated_at, owner_user_id) 
+                        VALUES ('{$itemCodeEscape}', '{$itemNameEscape}', $new_quantity, 'Stock Addition', 'Inventory', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, {$owner_user_id})";
+    }
+    
+    if ($conn->query($updateQuery)) {
+        echo json_encode(['success' => true, 'message' => 'Inventory updated successfully']);
+    } else {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Database error: ' . $conn->error]);
+    }
+    exit;
+}
+
 // Function to identify grouping based on item name
 function identifyGrouping($itemName) {
     $lowerName = strtolower($itemName);
@@ -63,19 +128,20 @@ if (isset($_SESSION['highlight_item_code'])) {
 } elseif (isset($_GET['highlight'])) {
     $highlightItemCode = strtoupper(trim($_GET['highlight']));
 }
+
+// Query inventory from delivery_records where company_name = 'Stock Addition'
+// This is the primary inventory source. Items with no 'sold_to' value are automatically routed here.
 $result = $conn->query("
     SELECT 
         id,
         item_code,
         item_name,
-        box_code,
-        model_no,
         quantity as current_stock,
-        notes as source_filename,
-        COALESCE(updated_at, created_at, NOW()) as last_updated
+        updated_at as last_updated
     FROM delivery_records
-    WHERE company_name = 'Stock Addition'{$owner_filter_sql} {$searchFilter}
-    ORDER BY COALESCE(updated_at, created_at) DESC
+    WHERE company_name = 'Stock Addition' {$owner_filter_sql}
+    {$searchFilter}
+    ORDER BY updated_at DESC
 ");
 
 if ($result) {
@@ -93,14 +159,14 @@ if ($result) {
         }
         
         $items[] = [
-            'id' => $row['id'],
+            'id' => $row['id'] ?? null,
             'code' => $row['item_code'],
             'name' => $itemName,
-            'box' => $row['box_code'],
-            'model' => $row['model_no'],
+            'box' => '',
+            'model' => '',
             'stock' => intval($row['current_stock']),
             'actual_stock' => intval($row['current_stock']),
-            'source_file' => $row['source_filename'] ? str_replace('File: ', '', $row['source_filename']) : '',
+            'source_file' => '',
             'last_updated' => $lastUpdated,
             'grouping' => identifyGrouping($itemName),
             'is_highlighted' => ($highlightItemCode && strtoupper($row['item_code']) === $highlightItemCode)
@@ -175,10 +241,9 @@ $purchaseOrderProducts = [];
 $poItemsQuery = $conn->query(" 
     SELECT DISTINCT item_code, item_name
     FROM delivery_records
-    WHERE company_name = 'Stock Addition'{$owner_filter_sql}
+    WHERE company_name = 'Stock Addition' {$owner_filter_sql}
       AND item_code IS NOT NULL AND item_code != ''
       AND item_name IS NOT NULL AND item_name != ''
-      AND (box_code IS NULL OR box_code = '')
     ORDER BY item_code ASC
 ");
 if ($poItemsQuery) {
@@ -543,6 +608,15 @@ if ($poItemsQuery) {
 
         .action-add:hover {
             box-shadow: 0 4px 12px rgba(46, 204, 113, 0.3);
+        }
+
+        .action-edit {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: #fff;
+        }
+
+        .action-edit:hover {
+            box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
         }
 
         .action-delete {
@@ -1750,13 +1824,13 @@ if ($poItemsQuery) {
                                 <i class="fas fa-times"></i> Clear
                             </a>
                         <?php endif; ?>
+                        <?php if ($dataset_is_enabled && $canAddInventory): ?>
+                        <button type="button" class="btn-add-record" onclick="openEditModal('', '', 0)" style="margin-left: auto;">
+                            <i class="fas fa-plus"></i> Add Inventory
+                        </button>
+                        <?php endif; ?>
                     </form>
                 </div>
-                <?php if ($dataset_is_enabled && isPermissionEnabled('inventory_add_item', $conn)): ?>
-                <button class="add-stock-btn" id="addNewItemBtn" style="background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%);" onclick="openAddItemModal()">
-                    <i class="fas fa-plus"></i> Add New Item
-                </button>
-                <?php endif; ?>
             </div>
 
             <!-- Tab Navigation -->
@@ -1913,7 +1987,7 @@ if ($poItemsQuery) {
                 </span>
                 <span style="font-size: 14px; font-weight: 400; color: #000000; text-transform: none;">
                     Showing <?php echo count($items); ?> of <span id="totalCount"><?php 
-                        // Get total count - count ALL rows (not just distinct codes)
+                        // Get total count - count ALL rows from Stock Addition items
                         $totalCountResult = $conn->query("SELECT COUNT(*) as cnt FROM delivery_records WHERE company_name = 'Stock Addition'{$owner_filter_sql}");
                         $totalCountRow = $totalCountResult->fetch_assoc();
                         echo $totalCountRow['cnt'];
@@ -2033,6 +2107,11 @@ if ($poItemsQuery) {
                                 <button class="action-btn action-view action-btn-horizontal" title="View" onclick="viewItemDetails('<?php echo htmlspecialchars($item['code']); ?>', '<?php echo htmlspecialchars($item['name']); ?>', <?php echo $item['stock']; ?>)">
                                     <i class="fas fa-eye"></i>
                                 </button>
+                                <?php if (isPermissionEnabled('inventory_edit_item', $conn)): ?>
+                                <button class="action-btn action-edit action-btn-horizontal" title="Edit" onclick="openEditModal('<?php echo htmlspecialchars($item['code']); ?>', '<?php echo htmlspecialchars($item['name']); ?>', <?php echo $item['stock']; ?>)">
+                                    <i class="fas fa-pencil-alt"></i>
+                                </button>
+                                <?php endif; ?>
                                 <?php if (isPermissionEnabled('inventory_delete_item', $conn)): ?>
                                 <button class="action-btn action-delete action-btn-horizontal" title="Delete" onclick="confirmDeleteItem('<?php echo htmlspecialchars($item['code']); ?>', '<?php echo htmlspecialchars($item['name']); ?>')">
                                     <i class="fas fa-trash"></i>
@@ -2300,77 +2379,6 @@ if ($poItemsQuery) {
         </div>
     </div>
 
-    <!-- Add New Item Modal -->
-    <div id="addItemModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2><i class="fas fa-box-plus"></i> Add New Item</h2>
-                <button class="close-btn" onclick="closeAddItemModal()">&times;</button>
-            </div>
-            <div id="itemModalAlert" class="alert"></div>
-            <form id="addItemForm" onsubmit="submitAddItem(event)">
-                <div class="form-group">
-                    <label for="boxCode">Box</label>
-                    <input 
-                        type="text" 
-                        id="boxCode" 
-                        name="box_code" 
-                        placeholder="E.g., BOX-001, KB-001" 
-                        required
-                    >
-                </div>
-                <div class="form-group">
-                    <label for="items">Items</label>
-                    <input 
-                        type="text" 
-                        id="items" 
-                        name="items" 
-                        placeholder="E.g., BW-001, 2 Year Carbon Monoxide Detector" 
-                        required
-                    >
-                </div>
-                <div class="form-group">
-                    <label for="itemDescription">Description</label>
-                    <textarea 
-                        id="itemDescription" 
-                        name="item_description" 
-                        placeholder="Enter item description..." 
-                        style="resize: vertical; min-height: 80px;"
-                    ></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="oum">OUM (Unit of Measure)</label>
-                    <input 
-                        type="text" 
-                        id="oum" 
-                        name="oum" 
-                        placeholder="E.g., PCS, UNIT, BOX" 
-                        required
-                    >
-                </div>
-                <div class="form-group">
-                    <label for="inventory">Inventory</label>
-                    <input 
-                        type="number" 
-                        id="inventory" 
-                        name="inventory_qty" 
-                        placeholder="Enter inventory quantity" 
-                        min="0"
-                    >
-                    <small style="color: #8a9ab5; margin-top: 5px; display: block;">Optional: Set the inventory quantity now</small>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn-submit">
-                        <i class="fas fa-check"></i> Create Item
-                    </button>
-                    <button type="button" class="btn-cancel" onclick="closeAddItemModal()">
-                        Cancel
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- Add Order Info Modal -->
     <div id="addOrderModal" class="modal">
         <div class="modal-content">
@@ -2589,18 +2597,6 @@ if ($poItemsQuery) {
         }
 
         // Add New Item Modal Functions
-        function openAddItemModal() {
-            document.getElementById('addItemModal').style.display = 'block';
-            document.getElementById('addItemForm').reset();
-            document.getElementById('itemModalAlert').style.display = 'none';
-        }
-
-        function closeAddItemModal() {
-            document.getElementById('addItemModal').style.display = 'none';
-            document.getElementById('addItemForm').reset();
-            document.getElementById('itemModalAlert').style.display = 'none';
-        }
-
         // Add Order Modal Functions
         function openAddOrderModal() {
             document.getElementById('addOrderModal').style.display = 'block';
@@ -2669,129 +2665,15 @@ if ($poItemsQuery) {
 
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const addItemModal = document.getElementById('addItemModal');
             const addOrderModal = document.getElementById('addOrderModal');
             const editOrderModal = document.getElementById('editOrderModal');
             
-            if (event.target === addItemModal) {
-                closeAddItemModal();
-            }
             if (event.target === addOrderModal) {
                 closeAddOrderModal();
             }
             if (event.target === editOrderModal) {
                 closeEditOrderModal();
             }
-        }
-
-        // Submit add item form
-        function submitAddItem(event) {
-            event.preventDefault();
-            
-            const formData = new FormData(document.getElementById('addItemForm'));
-            const alertDiv = document.getElementById('itemModalAlert');
-            const submitBtn = document.querySelector('#addItemForm .btn-submit');
-            const originalBtnHTML = submitBtn.innerHTML;
-
-            // Show loading state
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Item...';
-            alertDiv.style.display = 'none';
-
-            fetch('api/add-item.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alertDiv.className = 'alert alert-success';
-                    alertDiv.innerHTML = `<i class="fas fa-check-circle"></i> Item created successfully! Adding to table...`;
-                    alertDiv.style.display = 'block';
-                    
-                    // Add new item to the top of the table
-                    const tbody = document.getElementById('inventory-tbody');
-                    
-                    // Create new row
-                    const newRow = document.createElement('tr');
-                    newRow.className = 'inventory-row new-item-highlight';
-                    newRow.style.animation = 'slideIn 0.4s ease-out';
-                    
-                    let statusBadge = '';
-                    let qty = data.inventory_qty || 0;
-                    if (qty <= 5) {
-                        statusBadge = '<span style="background: #ff6b6b; color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-block;">Critical</span>';
-                    } else if (qty > 5 && qty <= 20) {
-                        statusBadge = '<span style="background: #ffa500; color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-block;">Low</span>';
-                    } else if (qty > 20 && qty <= 100) {
-                        statusBadge = '<span style="background: #4a90e2; color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-block;">Adequate</span>';
-                    } else {
-                        statusBadge = '<span style="background: #2ecc71; color: #fff; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; white-space: nowrap; display: inline-block;">High</span>';
-                    }
-                    
-                    newRow.innerHTML = `
-                        <td style="text-align: center; font-weight: bold; color: #f4d03f;">1</td>
-                        <td><span class="item-code" style="background: rgba(244, 208, 63, 0.1); color: #f4d03f;">${data.box_code}</span></td>
-                        <td>${data.items}</td>
-                        <td>${data.item_description || '-'}</td>
-                        <td style="text-align: center; font-weight: 500;"></td>
-                        <td>${data.oum}</td>
-                        <td style="color: ${qty > 20 ? '#2ecc71' : qty > 5 ? '#ffa500' : '#ff6b6b'}; font-weight: 600;">${data.inventory_qty}</td>
-                        <td>${statusBadge}</td>
-                        <td style="text-align: center;">
-                            <button onclick="deleteInventoryItem('${data.box_code}')" title="Delete" style="color: #ff6b6b; background: rgba(255, 107, 107, 0.1); border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">DELETE</button>
-                        </td>
-                    `;
-                    
-                    // Remove empty message if present
-                    const emptyMsg = tbody.querySelector('tr td[colspan="8"]');
-                    if (emptyMsg) {
-                        emptyMsg.parentElement.remove();
-                    }
-                    
-                    // Insert at top
-                    tbody.insertBefore(newRow, tbody.firstChild);
-                    
-                    // Re-number rows
-                    const rows = tbody.querySelectorAll('tr');
-                    rows.forEach((row, index) => {
-                        const firstTd = row.querySelector('td:first-child');
-                        if (firstTd) {
-                            firstTd.textContent = index + 1;
-                        }
-                    });
-                    
-                    // Update total count
-                    const totalCount = document.getElementById('totalCount');
-                    if (totalCount) {
-                        totalCount.textContent = parseInt(totalCount.textContent) + 1;
-                    }
-                    
-                    // Close modal after 1 second
-                    setTimeout(() => {
-                        closeAddItemModal();
-                        alertDiv.style.display = 'none';
-                    }, 1000);
-                } else {
-                    alertDiv.className = 'alert alert-error';
-                    alertDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${data.error || 'Error creating item'}`;
-                    alertDiv.style.display = 'block';
-                    
-                    // Reset button
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = originalBtnHTML;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alertDiv.className = 'alert alert-error';
-                alertDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> Error creating item`;
-                alertDiv.style.display = 'block';
-                
-                // Reset button
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalBtnHTML;
-            });
         }
 
         // Inventory Upload Functions
@@ -2970,6 +2852,8 @@ if ($poItemsQuery) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                padding-top: 70px;
+                box-sizing: border-box;
                 z-index: 3000;
                 animation: fadeIn 0.3s ease-out;
             `;
@@ -3260,17 +3144,25 @@ if ($poItemsQuery) {
                     <!-- Logbook Entries List -->
             `;
             
+            // Helper function to safely format dates
+            const formatDate = (dateStr) => {
+                if (!dateStr || dateStr === '' || dateStr === '0000-00-00') return 'N/A';
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return 'N/A';
+                return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            };
+            
             // Loop through all orders and create an entry for each
             allOrders.forEach((orderDetails, index) => {
-                const orderDate = orderDetails.order_date ? new Date(orderDetails.order_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+                const orderDate = formatDate(orderDetails.order_date);
                 let deliveryDate = 'N/A';
                 let deliveryLabel = 'Expected Delivery:';
                 
                 if (orderDetails.status === 'In Inventory') {
-                    deliveryDate = orderDetails.expected_delivery_date ? new Date(orderDetails.expected_delivery_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+                    deliveryDate = formatDate(orderDetails.expected_delivery_date);
                     deliveryLabel = 'Delivered Date:';
                 } else {
-                    deliveryDate = orderDetails.expected_delivery_date ? new Date(orderDetails.expected_delivery_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
+                    deliveryDate = formatDate(orderDetails.expected_delivery_date);
                     deliveryLabel = 'Expected Delivery:';
                 }
                 
@@ -3965,6 +3857,177 @@ if ($poItemsQuery) {
                 dialog.remove();
                 onConfirm();
             };
+        }
+
+        // Edit Inventory Item
+        function openEditModal(itemCode, itemName, currentStock) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 3000;
+                animation: fadeIn 0.3s ease-out;
+            `;
+            
+            modal.innerHTML = `
+                <div style="
+                    background: #FFFFFF;
+                    border-radius: 15px;
+                    padding: 30px;
+                    width: 90%;
+                    max-width: 500px;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+                    border: 1px solid rgba(0, 0, 0, 0.1);
+                    animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+                ">
+                    <h2 style="color: #FFFFFF; margin-bottom: 15px; font-size: 30px; font-weight: 900; text-shadow: 0 4px 10px rgba(0,0,0,0.8); letter-spacing: 0.5px;">
+                        <i class="fas fa-pencil-alt" style="margin-right: 12px; color: #FFD700; font-size: 32px;"></i>EDIT INVENTORY
+                    </h2>
+                    <p style="color: #333333; margin-bottom: 25px; font-size: 15px;">Update the quantity for this item</p>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #333333; margin-bottom: 8px; font-weight: 600; font-size: 13px;">Item Code</label>
+                        <input type="text" value="${itemCode}" readonly style="
+                            width: 100%;
+                            padding: 10px 12px;
+                            border: 2px solid #1a2a3a;
+                            border-radius: 8px;
+                            background: #FFFFFF;
+                            color: #000000;
+                            font-family: 'Poppins', sans-serif;
+                            font-size: 13px;
+                        ">
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <label style="display: block; color: #333333; margin-bottom: 8px; font-weight: 600; font-size: 13px;">Item Name</label>
+                        <input type="text" value="${itemName}" readonly style="
+                            width: 100%;
+                            padding: 10px 12px;
+                            border: 2px solid #1a2a3a;
+                            border-radius: 8px;
+                            background: #FFFFFF;
+                            color: #000000;
+                            font-family: 'Poppins', sans-serif;
+                            font-size: 13px;
+                        ">
+                    </div>
+                    
+                    <div style="margin-bottom: 25px;">
+                        <label style="display: block; color: #333333; margin-bottom: 8px; font-weight: 600; font-size: 13px;">Current Quantity</label>
+                        <p style="color: #f4d03f; font-size: 18px; font-weight: 700; margin: 0;">${currentStock} UNITS</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 25px;">
+                        <label style="display: block; color: #333333; margin-bottom: 8px; font-weight: 600; font-size: 13px;">New Quantity</label>
+                        <input type="number" id="newQuantity" value="${currentStock}" min="0" style="
+                            width: 100%;
+                            padding: 12px;
+                            border: 2px solid #1a2a3a;
+                            border-radius: 8px;
+                            background: #FFFFFF;
+                            color: #000000;
+                            font-family: 'Poppins', sans-serif;
+                            font-size: 14px;
+                            font-weight: 600;
+                        ">
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button onclick="this.closest('div').parentElement.remove();" style="
+                            background: #555;
+                            color: #fff;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            font-size: 13px;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.background='#666'" onmouseout="this.style.background='#555'">
+                            Cancel
+                        </button>
+                        <button onclick="submitEditInventory('${itemCode}', '${itemName}', ${currentStock})" style="
+                            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+                            color: #fff;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            font-size: 13px;
+                            transition: all 0.3s ease;
+                        " onmouseover="this.style.boxShadow='0 10px 25px rgba(46,204,113,0.3)'" onmouseout="this.style.boxShadow='none'">
+                            <i class="fas fa-save" style="margin-right: 6px;"></i>Save Changes
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.remove();
+            };
+            
+            // Focus on input and select all text
+            setTimeout(() => {
+                const input = modal.querySelector('#newQuantity');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 100);
+        }
+        
+        // Submit Edit Inventory
+        function submitEditInventory(itemCode, itemName, oldQuantity) {
+            const newQuantityInput = document.querySelector('#newQuantity');
+            const newQuantity = parseInt(newQuantityInput.value);
+            
+            if (isNaN(newQuantity) || newQuantity < 0) {
+                showNotification('✗ Please enter a valid quantity', 'error', 3000);
+                return;
+            }
+            
+            showLoadingOverlay(true, 'Updating');
+            
+            const formData = new FormData();
+            formData.append('action', 'update_inventory');
+            formData.append('item_code', itemCode);
+            formData.append('new_quantity', newQuantity);
+            
+            fetch(window.location.href, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                showLoadingOverlay(false);
+                if (data.success) {
+                    showNotification('✓ Inventory updated successfully!', 'success', 2000);
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showNotification('✗ ' + (data.message || 'Failed to update inventory'), 'error', 4000);
+                }
+            })
+            .catch(error => {
+                showLoadingOverlay(false);
+                showNotification('✗ Error: ' + error.message, 'error', 4000);
+            });
+            
+            // Close the modal
+            document.querySelectorAll('div[style*="position: fixed"]').forEach(m => {
+                if (m.style.zIndex === '3000') m.remove();
+            });
         }
 
         // Confirm Delete Item

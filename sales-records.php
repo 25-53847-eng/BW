@@ -1237,18 +1237,6 @@ $yearOrders = json_encode(array_column($yearlySales, 'orders'));
                 </div>
             </div>
 
-            <!-- Dataset Indicator Banner -->
-            <div style="background: linear-gradient(90deg, #2a3f5f 0%, #1e2a38 100%); border-left: 4px solid #f4d03f; padding: 12px 16px; margin-bottom: 20px; border-radius: 6px; display: flex; align-items: center; gap: 10px;">
-                <i class="fas fa-database" style="color: #f4d03f; font-size: 14px;"></i>
-                <span style="color: #8a9ab5; font-size: 12px;">Current Dataset:</span>
-                <strong style="color: #fff; font-size: 13px;"><?php echo $selected_dataset === 'all' ? 'ALL DATA' : htmlspecialchars(strtoupper($selected_dataset)); ?></strong>
-                <?php if ($selected_dataset !== 'all'): ?>
-                <a href="sales-records.php" style="margin-left: auto; color: #f4d03f; font-size: 12px; text-decoration: none; opacity: 0.8; transition: opacity .2s;" title="View all datasets">
-                    <i class="fas fa-times-circle"></i> Clear
-                </a>
-                <?php endif; ?>
-            </div>
-
             <!-- Summary Cards -->
             <div class="summary-cards">
                 <div class="summary-card highlight">

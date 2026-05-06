@@ -1,5 +1,5 @@
-<?php
-require 'db_config.php';
+﻿<?php
+require '../db_config.php';
 
 // Check total records
 $result = $conn->query('SELECT COUNT(*) as cnt FROM delivery_records');
@@ -38,3 +38,4 @@ while ($row = $result->fetch_assoc()) {
     echo "ID: {$row['id']}, Company: {$row['company_name']}, Qty: {$row['quantity']}, Status: {$row['status']}, Owner: {$row['owner_user_id']}\n";
 }
 ?>
+

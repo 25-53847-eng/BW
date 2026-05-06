@@ -391,6 +391,7 @@ if ($warrantyTableExists) {
             align-items: center;
             justify-content: center;
             padding: 20px;
+            padding-top: 70px;
         }
         
         .report-modal.show {
@@ -764,7 +765,6 @@ if ($warrantyTableExists) {
     <main class="main-content" id="mainContent">
         <div class="page-title">
             <i class="fas fa-file-pdf"></i> Reports & Analytics
-            <?php echo renderDatasetIndicator($active_dataset); ?>
         </div>
 
         <!-- Report Cards -->

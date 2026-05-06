@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 $_SESSION['user_id'] = 14;
 $_SESSION['user_role'] = 'admin';
@@ -13,3 +13,4 @@ ob_end_clean();
 // The $stats array should be populated by now
 echo "Admin stats['total_companies']: " . $stats['total_companies'] . "\n";
 ?>
+

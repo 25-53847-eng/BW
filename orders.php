@@ -6,6 +6,10 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
+require_once 'api/permission-helper.php';
+
+$canCreateOrder = isPermissionEnabled('inventory_create_po', $conn);
+$canDeleteOrder = isPermissionEnabled('inventory_create_po', $conn);
 
 function so_id($id) {
     return 'SO-' . str_pad((string) $id, 3, '0', STR_PAD_LEFT);
@@ -32,6 +36,13 @@ $flash = $_SESSION['orders_flash'] ?? null;
 unset($_SESSION['orders_flash']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_order') {
+    // Check permission before creating order
+    if (!$canCreateOrder) {
+        $_SESSION['orders_flash'] = ['type' => 'error', 'message' => 'Permission denied. Admin has not granted you access to create purchase orders.'];
+        header('Location: orders.php', true, 302);
+        exit;
+    }
+    
     $customer = 'Andison Internal Order';
     $orderDate = trim($_POST['order_date'] ?? '');
     $poStatus = trim($_POST['po_status'] ?? 'No PO');
@@ -235,6 +246,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'delete_order') {
+    // Check permission before deleting order
+    if (!$canDeleteOrder) {
+        $_SESSION['orders_flash'] = ['type' => 'error', 'message' => 'Permission denied. Admin has not granted you access to delete orders.'];
+        header('Location: orders.php', true, 302);
+        exit;
+    }
+    
     $deleteId = intval($_POST['order_id'] ?? 0);
 
     if ($deleteId <= 0) {

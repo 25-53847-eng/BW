@@ -140,6 +140,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
     $deliveryDate = $dt->format('Y-m-d');
     $status = 'Pending';
     $targetCompany = 'Inquiry';
+    if ($poStatus === 'Received') {
+        $targetCompany = 'Delivery Records';
+        $status = 'Ready for Delivery';
+    }
     $soldTo = $customer;
     $datasetName = $selectedDataset !== 'all' ? $selectedDataset : '';
     $totalAmount = $quantity * $unitPrice;

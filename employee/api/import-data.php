@@ -58,14 +58,53 @@ if (empty($data)) {
 function excelDateToDate($excelDate) {
     if (empty($excelDate) || $excelDate == '-') return null;
     
-    // If it's already a date string, return as is
-    if (!is_numeric($excelDate)) {
-        return $excelDate;
+    $dateStr = trim(strval($excelDate));
+    
+    // If it's numeric, treat as Excel serial date
+    if (is_numeric($excelDate)) {
+        // Excel serial date conversion (Excel epoch is 1899-12-30)
+        $unix = ($excelDate - 25569) * 86400;
+        $timestamp = $unix;
+        $year = intval(date('Y', $timestamp));
+        // Only return date if year is valid (> 1900)
+        if ($year > 1900 && $year < 2100) {
+            return date('Y-m-d', $timestamp);
+        }
+        return null;
     }
     
-    // Excel serial date conversion (Excel epoch is 1899-12-30)
-    $unix = ($excelDate - 25569) * 86400;
-    return date('Y-m-d', $unix);
+    // For string dates, try strtotime first (most lenient)
+    $timestamp = @strtotime($dateStr);
+    if ($timestamp !== false && $timestamp > 0) {
+        $year = intval(date('Y', $timestamp));
+        if ($year > 1900 && $year < 2100) {
+            return date('Y-m-d', $timestamp);
+        }
+    }
+    
+    // Try explicit DateTime formats if strtotime failed
+    $formats = [
+        'Y-m-d',        // 2018-07-03
+        'm/d/Y',        // 07/03/2018
+        'd/m/Y',        // 03/07/2018
+        'Y/m/d',        // 2018/07/03
+        'm-d-Y',        // 07-03-2018
+        'd-m-Y',        // 03-07-2018
+        'j/n/Y',        // 7/3/2018 (no leading zeros)
+        'n/j/Y',        // 3/7/2018
+    ];
+    
+    foreach ($formats as $format) {
+        $date = DateTime::createFromFormat($format, $dateStr);
+        if ($date !== false) {
+            $year = $date->format('Y');
+            if ($year > 1900 && $year < 2100) {
+                return $date->format('Y-m-d');
+            }
+        }
+    }
+    
+    return null;
 }
 
 // Function to get month name from date
@@ -568,6 +607,29 @@ try {
             $conn->query('ALTER TABLE delivery_records ADD COLUMN sold_to VARCHAR(255) DEFAULT NULL');
         }
     }
+    
+    // Ensure owner_user_id column exists for user-scoped data
+    if ($isMysql) {
+        $ownerCol = $conn->query("SHOW COLUMNS FROM delivery_records LIKE 'owner_user_id'");
+        if (!$ownerCol || $ownerCol->num_rows === 0) {
+            $conn->query("ALTER TABLE delivery_records ADD COLUMN owner_user_id INT(11) DEFAULT 0 AFTER id");
+        }
+    } else {
+        $hasOwnerUserId = false;
+        $chkOwnerUserId = $conn->query('PRAGMA table_info(delivery_records)');
+        if ($chkOwnerUserId) {
+            while ($r = $chkOwnerUserId->fetch_assoc()) {
+                if (strtolower($r['name']) === 'owner_user_id') { $hasOwnerUserId = true; break; }
+            }
+        }
+        if (!$hasOwnerUserId) {
+            $conn->query('ALTER TABLE delivery_records ADD COLUMN owner_user_id INTEGER DEFAULT 0');
+        }
+    }
+    
+    // Get the owner user_id from session
+    $owner_user_id = intval($_SESSION['user_id'] ?? 0);
+    
     // Get dataset_name from request (e.g. data1, data2)
     $dataset_name = isset($request['dataset_name']) ? trim(strval($request['dataset_name'])) : '';
     if (empty($dataset_name)) $dataset_name = 'data1';
@@ -658,9 +720,54 @@ try {
     $errors  = [];
     $skipped = [];
 
+    // Pre-process: Normalize quantities for duplicate rows
+    // If multiple rows have same invoice_no, record_date, delivery_date, item_code, quantity
+    // but different serial_no → set quantity to 1 (each serial is 1 unit)
+    $groupKey = [];
+    foreach ($data as $idx => $rec) {
+        $inv = isset($rec['Invoice No.']) ? trim(strval($rec['Invoice No.'])) : '';
+        $rec_date = isset($rec['Date']) ? trim(strval($rec['Date'])) : '';
+        $del_date = isset($rec['Date Delivered']) ? trim(strval($rec['Date Delivered'])) : '';
+        $item = isset($rec['Item']) ? trim(strval($rec['Item'])) : '';
+        $qty = isset($rec['Qty.']) ? intval($rec['Qty.']) : 0;
+        $serial = isset($rec['Serial No.']) ? trim(strval($rec['Serial No.'])) : '';
+        
+        // Create key without serial_no and quantity for grouping
+        $key = md5($inv . '|' . $rec_date . '|' . $del_date . '|' . $item . '|' . $qty);
+        
+        if (!isset($groupKey[$key])) {
+            $groupKey[$key] = [];
+        }
+        $groupKey[$key][] = ['index' => $idx, 'serial' => $serial, 'qty' => $qty];
+    }
+    
+    // For groups with multiple different serial numbers, set quantity to 1
+    foreach ($groupKey as $key => $group) {
+        if (count($group) > 1) {
+            // Check if serials are actually different
+            $serials = array_unique(array_map(fn($item) => $item['serial'], $group));
+            if (count($serials) > 1) {
+                // Multiple different serials with same invoice/date/item/qty → normalize to qty=1
+                foreach ($group as $item) {
+                    $idx = $item['index'];
+                    // Find the qty column name in the original data
+                    if (isset($data[$idx])) {
+                        foreach ($data[$idx] as $colName => $val) {
+                            if (strtolower(trim($colName)) === 'qty.' || strtolower(trim($colName)) === 'quantity') {
+                                $data[$idx][$colName] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Start transaction
     if ($conn instanceof mysqli) {
         $conn->begin_transaction();
+        // Temporarily disable the trigger during import to avoid rollback issues
+        $conn->query("DROP TRIGGER IF EXISTS delivery_deduct_inventory");
     } else {
         $conn->query('BEGIN');
     }
@@ -728,13 +835,8 @@ try {
                 }
             }
             
-            // If we have month+day+year but no delivery_date, build one
-            if (empty($delivery_date) && !empty($delivery_month) && $delivery_day > 0 && $year > 0) {
-                $month_num = date('n', strtotime($delivery_month . ' 1'));
-                if ($month_num) {
-                    $delivery_date = sprintf('%04d-%02d-%02d', $year, $month_num, $delivery_day);
-                }
-            }
+            // DO NOT auto-build delivery_date from component fields if it was blank in source
+            // Only use the delivery_date if it came directly from the "Date Delivered" Excel column
             
             // Don't auto-fill year if not provided
             // if ($year <= 0) $year = intval(date('Y'));
@@ -928,13 +1030,34 @@ try {
                 $status = 'Delivered';
             }
             
+            // AUTO-ROUTING LOGIC: Route items based on 'sold_to' field
+            // If sold_to is empty, route to Stock Addition (inventory)
+            // If sold_to contains Andison Manila or Stock in Manila variations, route to Andison Manila
+            // Otherwise use the provided company_name
+            if (empty($sold_to) || $sold_to == '-') {
+                // No sold_to value → Goes to Stock Addition (Inventory)
+                $company_name = 'Stock Addition';
+                $sold_to = '';
+            } else {
+                $sold_to_lower = strtolower(trim($sold_to));
+                // Check if sold_to contains Andison Manila or Stock in Manila variations
+                // ONLY route to Andison Manila if sold_to explicitly mentions 'andison' or 'stock in manila'
+                // Do NOT route just because it contains 'manila' (other companies like Kunimori Engineering Works-Manila should not route here)
+                if (strpos($sold_to_lower, 'andison') !== false || strpos($sold_to_lower, 'andiso') !== false || 
+                    strpos($sold_to_lower, 'stock in manila') !== false) {
+                    $company_name = 'to Andison Manila';
+                    // Keep the original sold_to value for reference
+                }
+                // Otherwise keep the provided company_name (might be a client name)
+            }
+            
             // Don't set default delivery month/day - only store what's in the Excel
             // Don't auto-fill quantity - if Excel has no quantity, leave it as 0/empty
 
             // Insert into database
             $sql = "INSERT INTO delivery_records 
-                    (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name, owner_user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             
             $stmt = $conn->prepare($sql);
             if (!$stmt) {
@@ -944,9 +1067,9 @@ try {
             // Types: s=invoice_no, s=serial_no, s=delivery_month, i=delivery_day,
             //        i=delivery_year, s=record_date, s=delivery_date, s=item_code, s=item_name,
             //        s=company_name, s=sold_to, i=quantity, s=status, s=highlight_color, s=cell_styles, s=notes, s=uom,
-            //        s=sold_to_month, i=sold_to_day, s=groupings, s=dataset_name
+            //        s=sold_to_month, i=sold_to_day, s=groupings, s=dataset_name, i=owner_user_id
             $stmt->bind_param(
-                'sssiissssssissssssiss',
+                'sssiissssssissssssissi',
                 $invoice_no,
                 $serial_no,
                 $delivery_month,
@@ -967,7 +1090,8 @@ try {
                 $sold_to_month,
                 $sold_to_day,
                 $groupings,
-                $dataset_name
+                $dataset_name,
+                $owner_user_id
             );
 
             if (!$stmt->execute()) {
@@ -1089,6 +1213,15 @@ try {
     // Commit transaction
     if ($conn instanceof mysqli) {
         $conn->commit();
+        // Recreate the trigger after import
+        $conn->query("CREATE TRIGGER delivery_deduct_inventory
+            AFTER INSERT ON delivery_records
+            FOR EACH ROW
+            BEGIN
+                UPDATE inventory 
+                SET quantity = GREATEST(0, quantity - NEW.quantity)
+                WHERE item_code = NEW.item_code;
+            END");
     } else {
         $conn->query('COMMIT');
     }

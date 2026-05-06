@@ -1,8 +1,5 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_role'])) {
-    $_SESSION['user_role'] = 'employee';
-}
 
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php', true, 302);
@@ -11,16 +8,11 @@ if (empty($_SESSION['user_id'])) {
 
 require_once 'db_config.php';
 require_once 'dataset-indicator.php';
-require_once '../api/permission-helper.php';
 require_once '../api/dataset-status-helper.php';
+require_once '../api/permission-helper.php';
 
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
-
-// Check permission for adding inquiries
-$canAddInquiry = isPermissionEnabled('inquiry_add_records', $conn);
-
-$selectedDataset = isset($_GET['dataset']) ? trim((string) $_GET['dataset']) : (isset($_SESSION['active_dataset']) ? trim((string) $_SESSION['active_dataset']) : 'all');
 
 function h($value) {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
@@ -191,12 +183,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'creat
         if ($stmt->execute()) {
             $_SESSION['inquiry_flash'] = [
                 'type' => 'success',
-                'message' => $poStatus === 'Received'
-                    ? 'Inquiry created and routed to Delivery Records.'
-                    : 'Inquiry created successfully.'
+                'message' => 'Inquiry created successfully.'
             ];
             $stmt->close();
-            $redirect = ($poStatus === 'Received') ? 'delivery-records.php' : 'inquiry.php';
+            $redirect = 'inquiry.php';
             if ($selectedDataset !== 'all') {
                 $redirect .= '?dataset=' . urlencode($selectedDataset);
             }
@@ -255,8 +245,7 @@ if ($listResult) {
     }
 }
 
-// Use permission-based check instead of hardcoded admin names
-// $canAddInquiry is already set at the top based on permissions
+$canAddInquiry = is_inquiry_admin();
 ?>
 <!DOCTYPE html>
 <html lang="en">

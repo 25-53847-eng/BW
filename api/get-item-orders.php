@@ -49,7 +49,7 @@ try {
     
     while ($row = $result->fetch_assoc()) {
         // Extract expected delivery date from notes if available
-        $expected_delivery = null;
+        $expected_delivery = '';
         if ($row['notes'] && strpos($row['notes'], '[Expected Delivery:') !== false) {
             preg_match('/\[Expected Delivery: (\d{4}-\d{2}-\d{2})\]/', $row['notes'], $matches);
             if (!empty($matches[1])) {
@@ -61,10 +61,10 @@ try {
         $months = ['January', 'February', 'March', 'April', 'May', 'June', 
                    'July', 'August', 'September', 'October', 'November', 'December'];
         $month_num = array_search($row['delivery_month'], $months);
-        if ($month_num !== false) {
+        if ($month_num !== false && $row['delivery_year'] && $row['delivery_day']) {
             $order_date = sprintf('%04d-%02d-%02d', $row['delivery_year'], $month_num + 1, $row['delivery_day']);
         } else {
-            $order_date = null;
+            $order_date = '';
         }
         
         $orders[] = [
@@ -115,14 +115,14 @@ try {
             $months = ['January', 'February', 'March', 'April', 'May', 'June', 
                        'July', 'August', 'September', 'October', 'November', 'December'];
             $month_num = array_search($inv_row['delivery_month'], $months);
-            if ($month_num !== false) {
+            if ($month_num !== false && $inv_row['delivery_year'] && $inv_row['delivery_day']) {
                 $order_date = sprintf('%04d-%02d-%02d', $inv_row['delivery_year'], $month_num + 1, $inv_row['delivery_day']);
             } else {
-                $order_date = null;
+                $order_date = '';
             }
             
             // Delivery date from created_at (when it was moved to inventory)
-            $delivery_date = null;
+            $delivery_date = '';
             if ($inv_row['created_at']) {
                 $delivery_date = substr($inv_row['created_at'], 0, 10); // Extract date part from timestamp
             }

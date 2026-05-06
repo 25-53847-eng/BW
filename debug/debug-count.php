@@ -1,8 +1,8 @@
-<?php
+﻿<?php
 session_start();
 $_SESSION['user_id'] = 14; // Set admin user
-require 'db_config.php';
-require 'helpers/client-helper.php';
+require '../db_config.php';
+require '../helpers/client-helper.php';
 
 // Test 1: Dashboard query (from countClientCompanies)
 $dataset_filter = ' AND company_name != ?';
@@ -59,3 +59,4 @@ if ($stmt) {
     $stmt->close();
 }
 ?>
+

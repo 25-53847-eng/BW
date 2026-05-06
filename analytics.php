@@ -33,6 +33,35 @@ $productsData = [];
 $groupA = [];
 $groupB = [];
 
+// Function to identify grouping based on item name
+function identifyGrouping($itemName) {
+    $lowerName = strtolower($itemName);
+    
+    // Multi Gas indicators
+    if (strpos($lowerName, 'multi') !== false || 
+        strpos($lowerName, 'quattro') !== false || 
+        strpos($lowerName, 'quad') !== false ||
+        strpos($lowerName, 'o2/lel/h2s/co') !== false ||
+        preg_match('/o2.*lel|lel.*o2/', $lowerName)) {
+        return 'Group B - Multi Gas';
+    }
+    
+    // Single Gas indicators
+    if (strpos($lowerName, 'single') !== false ||
+        preg_match('/\b(O2|LEL|H2S|CO)\b/i', $lowerName)) {
+        return 'Group A - Single Gas';
+    }
+    
+    // Default to Single Gas if unclear
+    return 'Group A - Single Gas';
+}
+
+// Function to check if item is warranty replacement
+function isWarrantyReplacementItem($itemName, $groupings) {
+    $lowerGroupings = strtolower(trim($groupings ?? ''));
+    return strpos($lowerGroupings, 'warranty replacement') !== false || strpos($lowerGroupings, '3a') !== false;
+}
+
 // Total delivered to Andison (all records in delivery_records)
 $result = $conn->query("SELECT COUNT(*) as total_orders, COALESCE(SUM(quantity), 0) as total_units FROM delivery_records WHERE 1=1$dataset_filter");
 if ($result && $row = $result->fetch_assoc()) {
@@ -83,16 +112,23 @@ if ($result) {
     }
 }
 
-// Products/Items data
+// Products/Items data - exclude warranty items, orders, and inventory items, and show only significant items
 $result = $conn->query("
     SELECT item_name, item_code,
            COUNT(*) as order_count,
            COALESCE(SUM(quantity), 0) as total_qty,
            COUNT(DISTINCT company_name) as company_count
     FROM delivery_records 
-    WHERE item_name IS NOT NULL$dataset_filter
+    WHERE item_name IS NOT NULL
+        AND company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition')
+        AND (sold_to IS NOT NULL AND sold_to != '')
+        AND NOT (LOWER(TRIM(COALESCE(sold_to, ''))) IN ('stock in manila') OR LOWER(TRIM(COALESCE(sold_to, ''))) LIKE '%stock in manila%')
+        AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')
+        $dataset_filter
     GROUP BY item_name, item_code
+    HAVING COALESCE(SUM(quantity), 0) > 5
     ORDER BY total_qty DESC
+    LIMIT 30
 ");
 if ($result) {
     while ($row = $result->fetch_assoc()) {
@@ -100,13 +136,13 @@ if ($result) {
     }
 }
 
-// Separate into Group A (MCX3) and Group B (MCXL) models
+// Separate into Group A (Single Gas) and Group B (Multi Gas) models
 foreach ($productsData as $product) {
-    $name = strtoupper($product['item_name'] ?? $product['item_code'] ?? '');
-    if (strpos($name, 'MCX3') !== false) {
-        $groupA[] = $product;
-    } elseif (strpos($name, 'MCXL') !== false) {
+    $groupLabel = identifyGrouping($product['item_name'] ?? $product['item_code'] ?? '');
+    if ($groupLabel === 'Group B - Multi Gas') {
         $groupB[] = $product;
+    } else {
+        $groupA[] = $product;
     }
 }
 
@@ -210,7 +246,7 @@ foreach ($topCompanies as $company) {
             padding: 25px;
             border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.1);
-            min-height: 350px;
+            min-height: 500px;
         }
         
         .chart-title {
@@ -495,12 +531,11 @@ foreach ($topCompanies as $company) {
                             <td><strong><?php echo htmlspecialchars($row['delivery_month']); ?></strong></td>
                             <td><?php echo number_format($row['order_count']); ?></td>
                             <td><?php echo number_format($qty); ?></td>
-                            <td>$<?php echo $revenue; ?>K</td>
+                            <td>₱<?php echo $revenue; ?>K</td>
                         </tr>
                         <?php 
                             $prevQty = $qty;
-                        endforeach; 
-                        ?>
+                        endforeach; ?>
                         <?php if (empty($monthlyData)): ?>
                         <tr>
                             <td colspan="4" style="text-align: center; color: #888;">No monthly data available</td>
@@ -513,14 +548,9 @@ foreach ($topCompanies as $company) {
             <!-- MODEL GROUP A ANALYTICS -->
             <h2 class="section-title">🎯 Group A Model Analytics</h2>
             <div class="chart-row">
-                <div class="chart-container-full chart-expandable" onclick="openChartPreview('groupAChart','Group A Sales Distribution')" style="position:relative;">
-                    <div class="chart-title">Group A Sales Distribution (Andison vs Companies)</div>
-                    <canvas id="groupAChart" style="max-height: 300px;"></canvas>
-                    <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
-                </div>
                 <div class="chart-container-full chart-expandable" onclick="openChartPreview('groupABarChart','Group A Model Performance')" style="position:relative;">
                     <div class="chart-title">Group A Model Performance</div>
-                    <canvas id="groupABarChart" style="max-height: 300px;"></canvas>
+                    <canvas id="groupABarChart" style="max-height: 450px;"></canvas>
                     <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
                 </div>
             </div>
@@ -547,7 +577,7 @@ foreach ($topCompanies as $company) {
                             <td><?php echo number_format($product['order_count']); ?></td>
                             <td><?php echo number_format($qty); ?></td>
                             <td><?php echo $product['company_count']; ?> companies</td>
-                            <td>$<?php echo $revenue; ?>K</td>
+                            <td>₱<?php echo $revenue; ?>K</td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if (empty($groupA)): ?>
@@ -562,14 +592,9 @@ foreach ($topCompanies as $company) {
             <!-- MODEL GROUP B ANALYTICS -->
             <h2 class="section-title">🚀 Group B Model Analytics</h2>
             <div class="chart-row">
-                <div class="chart-container-full chart-expandable" onclick="openChartPreview('groupBChart','Group B Sales Distribution')" style="position:relative;">
-                    <div class="chart-title">Group B Sales Distribution (Andison vs Companies)</div>
-                    <canvas id="groupBChart" style="max-height: 300px;"></canvas>
-                    <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
-                </div>
                 <div class="chart-container-full chart-expandable" onclick="openChartPreview('groupBBarChart','Group B Model Performance')" style="position:relative;">
                     <div class="chart-title">Group B Model Performance</div>
-                    <canvas id="groupBBarChart" style="max-height: 300px;"></canvas>
+                    <canvas id="groupBBarChart" style="max-height: 450px;"></canvas>
                     <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
                 </div>
             </div>
@@ -596,7 +621,7 @@ foreach ($topCompanies as $company) {
                             <td><?php echo number_format($product['order_count']); ?></td>
                             <td><?php echo number_format($qty); ?></td>
                             <td><?php echo $product['company_count']; ?> companies</td>
-                            <td>$<?php echo $revenue; ?>K</td>
+                            <td>₱<?php echo $revenue; ?>K</td>
                         </tr>
                         <?php endforeach; ?>
                         <?php if (empty($groupB)): ?>
@@ -754,29 +779,6 @@ foreach ($topCompanies as $company) {
         // Group A Doughnut Chart with real data
         const groupALabels = analyticsData.groupA.map(p => p.name);
         const groupAValues = analyticsData.groupA.map(p => p.qty);
-        const groupACtx = document.getElementById('groupAChart').getContext('2d');
-        new Chart(groupACtx, {
-            type: 'doughnut',
-            data: {
-                labels: groupALabels.length > 0 ? groupALabels : ['No Data'],
-                datasets: [{
-                    data: groupAValues.length > 0 ? groupAValues : [1],
-                    backgroundColor: ['#2f5fa7', '#00d9ff', '#34d399', '#f4d03f', '#ff6b6b', '#9b59b6'],
-                    borderColor: '#ffffff',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: { padding: 15 }
-                    }
-                }
-            }
-        });
-
         // Group A Bar Chart with real data
         const groupABarCtx = document.getElementById('groupABarChart').getContext('2d');
         new Chart(groupABarCtx, {
@@ -808,7 +810,11 @@ foreach ($topCompanies as $company) {
                     },
                     x: {
                         grid: { display: false },
-                        ticks: {}
+                        ticks: {
+                            maxRotation: 90,
+                            minRotation: 45,
+                            autoSkip: false
+                        }
                     }
                 }
             }
@@ -817,29 +823,6 @@ foreach ($topCompanies as $company) {
         // Group B Doughnut Chart with real data
         const groupBLabels = analyticsData.groupB.map(p => p.name);
         const groupBValues = analyticsData.groupB.map(p => p.qty);
-        const groupBCtx = document.getElementById('groupBChart').getContext('2d');
-        new Chart(groupBCtx, {
-            type: 'doughnut',
-            data: {
-                labels: groupBLabels.length > 0 ? groupBLabels : ['No Data'],
-                datasets: [{
-                    data: groupBValues.length > 0 ? groupBValues : [1],
-                    backgroundColor: ['#ff6b6b', '#ff9500', '#00d9ff', '#34d399', '#9b59b6', '#2f5fa7'],
-                    borderColor: '#ffffff',
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: { padding: 15 }
-                    }
-                }
-            }
-        });
-
         // Group B Bar Chart with real data
         const groupBBarCtx = document.getElementById('groupBBarChart').getContext('2d');
         new Chart(groupBBarCtx, {
@@ -871,13 +854,15 @@ foreach ($topCompanies as $company) {
                     },
                     x: {
                         grid: { display: false },
-                        ticks: {}
+                        ticks: {
+                            maxRotation: 90,
+                            minRotation: 45,
+                            autoSkip: false
+                        }
                     }
                 }
             }
         });
-
-        // Gauge Charts for Andison and Companies
         const gaugeData = {
             andison: 696,
             companies: 311
@@ -965,7 +950,7 @@ foreach ($topCompanies as $company) {
     </script>
 
     <!-- ===== CHART PREVIEW MODAL ===== -->
-    <div id="chartPreviewOverlay" onclick="closeChartPreview(event)" style="display:none;position:fixed;inset:0;z-index:9999;backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
+    <div id="chartPreviewOverlay" onclick="closeChartPreview(event)" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
         <div id="chartPreviewBox" style="border-radius:16px;width:min(1200px,97vw);height:90vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,0.6);overflow:hidden;">
             <div id="chartPreviewHeader" style="display:flex;align-items:center;justify-content:space-between;padding:18px 26px;flex-shrink:0;">
                 <h3 id="chartPreviewTitle" style="margin:0;font-size:18px;font-weight:700;"></h3>

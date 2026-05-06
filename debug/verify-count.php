@@ -1,8 +1,8 @@
-<?php
+﻿<?php
 session_start();
 $_SESSION['user_id'] = 14;
-require 'db_config.php';
-require 'helpers/client-helper.php';
+require '../db_config.php';
+require '../helpers/client-helper.php';
 
 // Exact same params as index.php
 $dataset_filter = ' AND company_name != ?';
@@ -47,3 +47,4 @@ if ($stmt) {
     $stmt->close();
 }
 ?>
+

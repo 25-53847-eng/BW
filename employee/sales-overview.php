@@ -333,7 +333,7 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
         <div class="page-header">
             <h1 class="page-title">
                 <i class="fas fa-chart-pie"></i>
-                Sales Overview<?php echo renderDatasetIndicator($active_dataset); ?>
+                Sales Overview
             </h1>
         </div>
 

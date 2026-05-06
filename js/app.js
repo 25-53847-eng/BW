@@ -675,8 +675,8 @@ function showLogoutLoader() {
                 border-radius: 50%;
                 margin: 0 auto 20px;
             "></div>
-            <h3 style="color: #fff; margin: 0 0 10px; font-size: 20px; font-family: 'Poppins', sans-serif;">Logging out...</h3>
-            <p style="color: #a0a0a0; margin: 0; font-size: 14px; font-family: 'Poppins', sans-serif;">Please wait while we secure your session</p>
+            <h3 style="color: #5bbcff; margin: 0 0 10px; font-size: 20px; font-weight: 600; font-family: 'Poppins', sans-serif;">Logging out...</h3>
+            <p style="color: #90caf9; margin: 0; font-size: 14px; font-family: 'Poppins', sans-serif;">Please wait while we secure your session</p>
         </div>
     `;
     

@@ -373,7 +373,7 @@ foreach ($companies as $c) {
     <!-- MAIN CONTENT -->
     <main class="main-content" id="mainContent">
         <div class="page-title">
-            <i class="fas fa-building"></i> Client Companies<?php echo renderDatasetIndicator($active_dataset); ?>
+            <i class="fas fa-building"></i> Client Companies
         </div>
 
         <div class="search-container">
@@ -454,7 +454,8 @@ foreach ($companies as $c) {
             z-index: 1000;
             justify-content: center;
             align-items: center;
-            padding: 20px;
+            padding: 40px 20px;
+            padding-top: 70px;
         }
         .profile-modal-overlay.active {
             display: flex;
@@ -462,21 +463,28 @@ foreach ($companies as $c) {
         .profile-modal {
             background: #1e1e1e;
             border-radius: 16px;
-            width: 100%;
-            max-width: 900px;
+            width: 90%;
+            max-width: 950px;
             max-height: 90vh;
             display: flex;
             flex-direction: column;
             box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        .profile-modal::before {
+            content: '';
+            display: block;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
         .profile-modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 20px 24px;
+            padding: 24px 28px;
             border-bottom: 1px solid #333;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 16px 16px 0 0;
         }
         .profile-modal-header h2 {
             margin: 0;
@@ -504,9 +512,12 @@ foreach ($companies as $c) {
             background: rgba(255,255,255,0.3);
         }
         .profile-modal-body {
-            padding: 24px;
+            padding: 40px;
             overflow-y: auto;
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding-top: 40px;
         }
         .loading-spinner {
             text-align: center;
@@ -518,7 +529,9 @@ foreach ($companies as $c) {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 16px;
-            margin-bottom: 24px;
+            margin-bottom: 40px;
+            width: 100%;
+            padding-bottom: 16px;
         }
         .profile-stat {
             background: #2a2a2a;
@@ -538,7 +551,9 @@ foreach ($companies as $c) {
             text-transform: uppercase;
         }
         .profile-section {
-            margin-bottom: 24px;
+            margin-bottom: 40px;
+            width: 100%;
+            padding-top: 8px;
         }
         .profile-section-title {
             font-size: 1.1rem;

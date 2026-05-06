@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 
 // If already fully authenticated, redirect to profile
@@ -271,3 +271,4 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
     </script>
 </body>
 </html>
+

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 
 // Check if logged in
@@ -11,7 +11,7 @@ echo "Logged in as User ID: " . $_SESSION['user_id'] . "\n";
 echo "Role: " . ($_SESSION['user_role'] ?? 'Not set') . "\n";
 
 // Try to access the employee dashboard query
-require 'db_config.php';
+require '../db_config.php';
 
 // Same filter as employee/index.php
 $selected_dataset = null;
@@ -34,3 +34,4 @@ if ($stmt) {
     echo "Error: " . $conn->error . "\n";
 }
 ?>
+
