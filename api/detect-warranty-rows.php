@@ -41,13 +41,8 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 // Set JSON header IMMEDIATELY
 header('Content-Type: application/json; charset=utf-8');
 
-// Load PhpSpreadsheet - buffer vendor autoload to catch Composer platform_check echo output
-ob_start(); // Nested buffer to catch vendor output
+// Load PhpSpreadsheet - vendor output goes into main buffer from line 20, will be cleaned before response
 require_once __DIR__ . '/../vendor/autoload.php';
-$vendor_output = ob_get_clean(); // Discard vendor output (Composer platform check echoes)
-if (!empty($vendor_output)) {
-    error_log('Vendor autoload output (platform_check): ' . substr($vendor_output, 0, 200));
-}
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
