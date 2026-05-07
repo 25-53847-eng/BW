@@ -1534,8 +1534,8 @@ if ($conn) {
                     const reader = new FileReader();
                     reader.onload = function(e) {
                         try {
-                            const data = e.target.result;
-                            const workbook = XLSX.read(data, { type: 'binary', cellDates: true, cellStyles: true });
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array', cellDates: true, cellStyles: true });
                             
                             // Check for multiple sheets
                             if (workbook.SheetNames.length > 1) {
@@ -1562,7 +1562,7 @@ if ($conn) {
                         }
                     };
                     reader.onerror = reject;
-                    reader.readAsBinaryString(file);
+                    reader.readAsArrayBuffer(file);
                 }
             });
         }
