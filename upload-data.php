@@ -2127,18 +2127,42 @@ if ($conn) {
                     const localWarrantyRows = detectWarrantyRowsFromParsedData(rows);
                     const warranty_rows = Array.from(new Set([...(apiWarrantyRows || []), ...(localWarrantyRows || [])]));
 
+                    const payload = {
+                        data: rows,
+                        fileName: fileName,
+                        dataset_name: datasetName,
+                        warranty_rows: warranty_rows,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    console.log('📨 Sending to import-data.php:');
+                    console.log('   - Rows:', rows.length);
+                    console.log('   - Payload size:', JSON.stringify(payload).length, 'bytes');
+                    console.log('   - Dataset:', datasetName);
+
                     const response = await fetch('api/import-data.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            data: rows,
-                            fileName: fileName,
-                            dataset_name: datasetName,
-                            warranty_rows: warranty_rows,
-                            timestamp: new Date().toISOString()
-                        })
+                        body: JSON.stringify(payload)
                     });
-                    const result = await response.json();
+                    
+                    // Check if response is actually JSON
+                    const contentType = response.headers.get('content-type');
+                    const responseText = await response.text();
+                    
+                    console.log('📤 API Response Status:', response.status);
+                    console.log('📤 Content-Type:', contentType);
+                    console.log('📤 Response Body (first 500 chars):', responseText.substring(0, 500));
+                    
+                    if (!contentType || !contentType.includes('application/json')) {
+                        console.error('❌ API returned non-JSON! Content-Type:', contentType);
+                        console.error('❌ Full response:', responseText);
+                        showAlert('error', `API Error (${response.status}): Server returned ${contentType || 'unknown type'}. Check browser console for details.`);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected as Separate Datasets'; }
+                        return;
+                    }
+                    
+                    const result = JSON.parse(responseText);
                     if (result.success) {
                         totalImported += result.imported || rows.length;
                         totalFailed += result.failed || 0;
@@ -2149,6 +2173,7 @@ if ($conn) {
                         return;
                     }
                 } catch (err) {
+                    console.error('❌ Import error details:', err);
                     showAlert('error', `Failed to import item ${i + 1}: ${err.message}`);
                     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected as Separate Datasets'; }
                     return;
@@ -2245,18 +2270,42 @@ if ($conn) {
                     const localWarrantyRows = detectWarrantyRowsFromParsedData(rows);
                     const warranty_rows = Array.from(new Set([...(apiWarrantyRows || []), ...(localWarrantyRows || [])]));
 
+                    const payload = {
+                        data: rows,
+                        fileName: sheetName,
+                        dataset_name: datasetName,
+                        warranty_rows: warranty_rows,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    console.log('📨 Sending sheet to import-data.php:');
+                    console.log('   - Sheet:', sheetName);
+                    console.log('   - Rows:', rows.length);
+                    console.log('   - Payload size:', JSON.stringify(payload).length, 'bytes');
+
                     const response = await fetch('api/import-data.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            data: rows,
-                            fileName: sheetName,
-                            dataset_name: datasetName,
-                            warranty_rows: warranty_rows,
-                            timestamp: new Date().toISOString()
-                        })
+                        body: JSON.stringify(payload)
                     });
-                    const result = await response.json();
+                    
+                    // Check if response is actually JSON
+                    const contentType = response.headers.get('content-type');
+                    const responseText = await response.text();
+                    
+                    console.log('📤 Sheet Import - Status:', response.status);
+                    console.log('📤 Content-Type:', contentType);
+                    console.log('📤 Response (first 300 chars):', responseText.substring(0, 300));
+                    
+                    if (!contentType || !contentType.includes('application/json')) {
+                        console.error('❌ API returned non-JSON! Type:', contentType);
+                        console.error('❌ Full response:', responseText);
+                        showAlert('error', `API Error (${response.status}): Server returned ${contentType || 'unknown type'}`);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected Sheets'; }
+                        return;
+                    }
+                    
+                    const result = JSON.parse(responseText);
                     if (result.success) {
                         totalImported += result.imported || rows.length;
                         totalFailed   += result.failed  || 0;
@@ -2268,6 +2317,7 @@ if ($conn) {
                         return;
                     }
                 } catch (err) {
+                    console.error('❌ Sheet import error:', err);
                     showAlert('error', `Failed to import "${sheetName}": ${err.message}`);
                     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected Sheets'; }
                     return;

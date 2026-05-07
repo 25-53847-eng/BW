@@ -1,58 +1,110 @@
 <?php
+// Start output buffering FIRST, before anything else
 ob_start();
-session_start();
-header('Content-Type: application/json');
+
+// Set up error logging IMMEDIATELY
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Create a logs directory if it doesn't exist
+$logsDir = __DIR__ . '/../logs';
+if (!is_dir($logsDir)) {
+    @mkdir($logsDir, 0755, true);
+}
+$logFile = $logsDir . '/import-api.log';
+ini_set('error_log', $logFile);
+
+// Custom error handler - log all errors/warnings to file, don't display
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    $msg = date('Y-m-d H:i:s') . " [$errno] $errstr in $errfile:$errline";
+    error_log($msg);
+    // Don't call the default handler (don't display the error)
+    return true;
+}, E_ALL);
+
+// Avoid "session already active" errors
+if (session_status() === PHP_SESSION_NONE) {
+    @session_start();
+}
+
+// Set JSON header
+header('Content-Type: application/json; charset=utf-8');
 
 // Increase limits for large imports
 ini_set('memory_limit', '256M');
 ini_set('max_execution_time', 300);
 set_time_limit(300);
 
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
-
-// Catch all PHP errors/warnings before they output and break JSON
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    // Log but don't output - return true to suppress default handler
-    error_log("API Error [$errno] in $errfile:$errline: $errstr");
-    return true;
-});
-
 // Set exception handler as fallback
 set_exception_handler(function($e) {
-    error_log("API Exception: " . $e->getMessage());
-    ob_clean();
+    $msg = date('Y-m-d H:i:s') . " EXCEPTION: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine();
+    error_log($msg);
+    error_log("Trace: " . $e->getTraceAsString());
+    // Clean ALL output buffers
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'System error: ' . $e->getMessage()]);
     exit;
 });
 
+// Wrap database config to catch any output
 try {
+    ob_start(); // Buffer any output from db_config
     require_once __DIR__ . '/../db_config.php';
+    $config_output = ob_get_clean(); // Get and discard any output
+    if (!empty($config_output)) {
+        error_log("Warning: db_config.php produced output: " . substr($config_output, 0, 200));
+    }
 } catch (Throwable $e) {
-    ob_clean();
+    ob_end_clean();
     http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['success' => false, 'message' => 'Database config error: ' . $e->getMessage()]);
     exit;
 }
 
 function respond(array $d, int $code = 200): never {
+    // Clean ALL output buffers to prevent HTML from leaking through
     while (ob_get_level() > 0) {
         ob_end_clean();
     }
+    // Ensure JSON header is set
+    header('Content-Type: application/json; charset=utf-8');
     http_response_code($code);
     echo json_encode($d);
     exit;
 }
 
 $json    = file_get_contents('php://input');
+
+// Validate JSON before parsing
+if (empty($json)) {
+    respond(['success' => false, 'message' => 'Empty request body'], 400);
+}
+
 $request = json_decode($json, true);
 
-if (!$request || !isset($request['data'])) {
-    respond(['success' => false, 'message' => 'Invalid request data'], 400);
+// Check for JSON parse errors
+if ($request === null) {
+    $error = json_last_error_msg();
+    error_log("JSON Parse Error: " . $error . " | Raw input: " . substr($json, 0, 200));
+    respond(['success' => false, 'message' => 'Invalid JSON: ' . $error], 400);
+}
+
+if (!isset($request['data'])) {
+    respond(['success' => false, 'message' => 'Missing data field in request'], 400);
 }
 
 $data = $request['data'];
+
+// Validate data is array
+if (!is_array($data)) {
+    respond(['success' => false, 'message' => 'Data must be an array'], 400);
+}
 
 // Get warranty rows list from request (optional, 0-based indices)
 $warranty_rows = isset($request['warranty_rows']) && is_array($request['warranty_rows']) ? $request['warranty_rows'] : [];
@@ -894,6 +946,13 @@ try {
 
             if (isset($mapped['cell_styles'])) {
                 $rawCellStyles = $mapped['cell_styles'];
+                
+                // If cell_styles came as a JSON string, decode it
+                if (is_string($rawCellStyles)) {
+                    $decoded = @json_decode($rawCellStyles, true);
+                    $rawCellStyles = is_array($decoded) ? $decoded : null;
+                }
+                
                 if (is_array($rawCellStyles)) {
                     $mappedCellStyles = [];
                     foreach ($rawCellStyles as $sourceField => $colorValue) {

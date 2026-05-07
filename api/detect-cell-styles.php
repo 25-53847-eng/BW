@@ -17,16 +17,40 @@
  * }
  */
 
+// Start buffering FIRST
+ob_start();
+
+// Set error handling IMMEDIATELY
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Create logs directory
+$logsDir = __DIR__ . '/../logs';
+if (!is_dir($logsDir)) {
+    @mkdir($logsDir, 0755, true);
+}
+ini_set('error_log', $logsDir . '/cell-styles-detection.log');
+
+// Catch all errors before they output
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log(date('Y-m-d H:i:s') . " [$errno] $errstr in $errfile:$errline");
+    return true; // Don't call default handler
+}, E_ALL);
+
+// Set JSON header IMMEDIATELY
+header('Content-Type: application/json; charset=utf-8');
+
+// Load PhpSpreadsheet - buffer vendor autoload to catch Composer platform_check echo output
+ob_start(); // Nested buffer to catch vendor output
 require_once __DIR__ . '/../vendor/autoload.php';
+$vendor_output = ob_get_clean(); // Discard vendor output (Composer platform check echoes)
+if (!empty($vendor_output)) {
+    error_log('Vendor autoload output (platform_check): ' . substr($vendor_output, 0, 200));
+}
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
-
-ob_start();
-header('Content-Type: application/json');
-
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
 
 if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
     ob_clean();
@@ -201,8 +225,13 @@ try {
         'message' => 'Cell styles extracted'
     ]);
 } catch (Throwable $e) {
-    ob_clean();
+    // Clean ALL buffers
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    error_log("Exception in cell styles detection: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
     http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode([
         'success' => false,
         'message' => 'Error extracting cell styles: ' . $e->getMessage()
