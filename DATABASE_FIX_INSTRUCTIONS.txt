@@ -1,0 +1,58 @@
+💡 DATABASE CONNECTION QUICK FIXES
+===========================================
+
+🔧 WHAT WAS FIXED:
+✅ Updated both db_config.php files to use port 3307
+✅ Added better error handling in API files
+✅ Improved database initialization
+✅ Created comprehensive diagnostics endpoint
+
+📋 NEXT STEPS - Choose ONE:
+
+OPTION 1: Check Connection Status (Recommended)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Visit: http://localhost/BW/api/diagnose.php
+2. This shows exactly what's working/not working
+3. Follow the recommendations shown there
+
+OPTION 2: Manual Database Setup (If needed)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. Make sure MySQL is running in XAMPP (check the module)
+2. Verify port is 3307 (not 3306):
+   - Look at XAMPP Control Panel → MySQL → Port field
+   - If it says 3306, change it to 3307 and restart
+
+3. Create the database:
+   - Open phpMyAdmin: http://localhost/phpmyadmin
+   - Click "New" database button
+   - Name: bw_gas_detector
+   - Collation: utf8mb4_unicode_ci
+   - Click Create
+
+4. Test with: http://localhost/BW/api/diagnose.php
+
+OPTION 3: Automatic Fix (Try Import)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Go back to upload page and try importing again.
+The system will automatically:
+1. Create the database if missing
+2. Create required tables
+3. Import your data
+
+🚨 COMMON ISSUES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"Unexpected token 'C', 'Composer d'..."
+→ MySQL connection is failing
+→ Check diagnostics at: http://localhost/BW/api/diagnose.php
+
+"Port 3307 refused connection"
+→ MySQL not running or wrong port
+→ Start MySQL in XAMPP Control Panel
+→ Verify port is 3307 in my.ini
+
+"Database not found"
+→ Will be auto-created on next import
+→ Or manually create in phpMyAdmin
+
+✨ DONE! Everything should now work. Try importing again!

@@ -794,12 +794,14 @@ CREATE TABLE `dataset_metadata` (
   `id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `dataset_name` varchar(255) NOT NULL UNIQUE,
   `description` text DEFAULT NULL,
+  `is_enabled` tinyint(1) NOT NULL DEFAULT 1 COMMENT 'Enable/disable dataset visibility and access',
   `created_by` int(11) DEFAULT NULL COMMENT 'Reference to users.id',
   `total_records` int(11) DEFAULT 0,
   `last_updated_by` int(11) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   KEY `idx_dataset_name` (`dataset_name`),
+  KEY `idx_is_enabled` (`is_enabled`),
   CONSTRAINT `fk_dataset_metadata_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_dataset_metadata_updater` FOREIGN KEY (`last_updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Metadata and information about datasets';

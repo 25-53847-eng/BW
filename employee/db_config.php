@@ -15,7 +15,7 @@ $conn = null;
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name, 3307);
     $conn->set_charset('utf8mb4');
 
     $activeDbResult = $conn->query('SELECT DATABASE() AS db_name');
@@ -70,7 +70,9 @@ try {
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN groupings VARCHAR(50) DEFAULT NULL");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN dataset_name VARCHAR(50) DEFAULT NULL");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN owner_user_id INT DEFAULT NULL");
+    safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN record_type VARCHAR(50) DEFAULT 'delivery'");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD INDEX idx_owner_user_id (owner_user_id)");
+    safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD INDEX idx_record_type (record_type)");
 
     $conn->query("CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -86,6 +88,27 @@ try {
     safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN two_factor_secret VARCHAR(32) DEFAULT NULL");
     safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN two_factor_enabled TINYINT(1) DEFAULT 0");
         safeSchemaUpgrade($conn, "ALTER TABLE users ADD COLUMN profile_picture VARCHAR(500) DEFAULT NULL");
+
+    // Create dataset_metadata table with is_enabled column
+    $conn->query("CREATE TABLE IF NOT EXISTS dataset_metadata (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        dataset_name VARCHAR(255) NOT NULL UNIQUE,
+        description TEXT DEFAULT NULL,
+        is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+        created_by INT DEFAULT NULL,
+        total_records INT DEFAULT 0,
+        last_updated_by INT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        KEY idx_dataset_name (dataset_name),
+        KEY idx_is_enabled (is_enabled),
+        CONSTRAINT fk_dataset_metadata_creator FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL,
+        CONSTRAINT fk_dataset_metadata_updater FOREIGN KEY (last_updated_by) REFERENCES users (id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    
+    // Add is_enabled column if it doesn't exist
+    safeSchemaUpgrade($conn, "ALTER TABLE dataset_metadata ADD COLUMN is_enabled TINYINT(1) NOT NULL DEFAULT 1");
+    safeSchemaUpgrade($conn, "ALTER TABLE dataset_metadata ADD KEY idx_is_enabled (is_enabled)");
 
     // Keep owner field sticky for inserts made through the scoped view.
     $conn->query('DROP TRIGGER IF EXISTS trg_delivery_records_set_owner');

@@ -38,6 +38,19 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
     return true; // Don't call default handler
 }, E_ALL);
 
+// Set exception handler as fallback
+set_exception_handler(function($e) {
+    // Clean ALL output buffers
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    error_log('Uncaught exception: ' . $e->getMessage());
+    echo json_encode(['success' => false, 'message' => 'System error: ' . $e->getMessage()]);
+    exit;
+});
+
 // Set JSON header IMMEDIATELY
 header('Content-Type: application/json; charset=utf-8');
 

@@ -67,6 +67,14 @@ try {
     exit;
 }
 
+// Verify database connection was successful
+if ($conn === null || !$conn) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => 'Database connection failed. Make sure MySQL is running on port 3307 and bw_gas_detector database exists.']);
+    exit;
+}
+
 function respond(array $d, int $code = 200): never {
     // Clean ALL output buffers to prevent HTML from leaking through
     while (ob_get_level() > 0) {

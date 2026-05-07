@@ -4,23 +4,50 @@
  * This script creates the database and tables if they don't exist
  */
 
+ob_start();
 header('Content-Type: application/json');
 
-// Use the main MySQL database config (bw_gas_detector)
-require_once __DIR__ . '/../db_config.php';
-
-// Check if connection is available (already established in db_config.php)
-if (!$conn || $conn->connect_error) {
+// First, try to create the database if it doesn't exist
+try {
+    $tempConn = @new mysqli('localhost', 'root', '', '', 3307);
+    
+    if ($tempConn->connect_error) {
+        throw new Exception('Cannot connect to MySQL: ' . $tempConn->connect_error);
+    }
+    
+    // Create database if not exists
+    $tempConn->query("CREATE DATABASE IF NOT EXISTS `bw_gas_detector` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+    $tempConn->close();
+} catch (Exception $e) {
+    ob_end_clean();
+    http_response_code(500);
     die(json_encode([
         'success' => false,
-        'message' => 'Database connection failed'
+        'message' => 'Could not create database: ' . $e->getMessage()
     ]));
 }
 
-if (!($conn instanceof mysqli)) {
+// Now use the main MySQL database config (bw_gas_detector)
+try {
+    ob_start();
+    require_once __DIR__ . '/../db_config.php';
+    $config_output = ob_get_clean();
+} catch (Exception $e) {
+    ob_end_clean();
+    http_response_code(500);
     die(json_encode([
         'success' => false,
-        'message' => 'MySQL connection required. Active database must be bw_gas_detector.'
+        'message' => 'Database configuration error: ' . $e->getMessage()
+    ]));
+}
+
+// Check if connection is available (already established in db_config.php)
+if (!$conn || $conn === null || !$conn instanceof mysqli) {
+    ob_end_clean();
+    http_response_code(500);
+    die(json_encode([
+        'success' => false,
+        'message' => 'MySQL connection required. Make sure MySQL is running on port 3307 and bw_gas_detector database exists.'
     ]));
 }
 

@@ -1,0 +1,27 @@
+[07-May-2026 06:11:37 Europe/Berlin] PHP Fatal error:  Uncaught RuntimeException: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30. in C:\xampp\htdocs\BW\vendor\composer\platform_check.php:26
+Stack trace:
+#0 C:\xampp\htdocs\BW\vendor\composer\autoload_real.php(25): require()
+#1 C:\xampp\htdocs\BW\vendor\autoload.php(22): ComposerAutoloaderInit62e10e6c8df9afc192311b196c75bb33::getLoader()
+#2 C:\xampp\htdocs\BW\api\detect-warranty-rows.php(45): require_once('C:\\xampp\\htdocs...')
+#3 {main}
+  thrown in C:\xampp\htdocs\BW\vendor\composer\platform_check.php on line 26
+[07-May-2026 06:11:40 Europe/Berlin] PHP Fatal error:  Uncaught RuntimeException: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30. in C:\xampp\htdocs\BW\vendor\composer\platform_check.php:26
+Stack trace:
+#0 C:\xampp\htdocs\BW\vendor\composer\autoload_real.php(25): require()
+#1 C:\xampp\htdocs\BW\vendor\autoload.php(22): ComposerAutoloaderInit62e10e6c8df9afc192311b196c75bb33::getLoader()
+#2 C:\xampp\htdocs\BW\api\detect-warranty-rows.php(45): require_once('C:\\xampp\\htdocs...')
+#3 {main}
+  thrown in C:\xampp\htdocs\BW\vendor\composer\platform_check.php on line 26
+[07-May-2026 06:13:55 Europe/Berlin] PHP Fatal error:  Uncaught RuntimeException: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30. in C:\xampp\htdocs\BW\vendor\composer\platform_check.php:26
+Stack trace:
+#0 C:\xampp\htdocs\BW\vendor\composer\autoload_real.php(25): require()
+#1 C:\xampp\htdocs\BW\vendor\autoload.php(22): ComposerAutoloaderInit62e10e6c8df9afc192311b196c75bb33::getLoader()
+#2 C:\xampp\htdocs\BW\api\detect-warranty-rows.php(45): require_once('C:\\xampp\\htdocs...')
+#3 {main}
+  thrown in C:\xampp\htdocs\BW\vendor\composer\platform_check.php on line 26
+[07-May-2026 06:16:58 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30.
+[07-May-2026 06:17:02 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30.
+[07-May-2026 06:17:31 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30.
+[07-May-2026 06:17:35 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30.
+[07-May-2026 06:20:21 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30.
+[07-May-2026 06:20:25 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.0.30.
