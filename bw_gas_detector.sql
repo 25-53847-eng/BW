@@ -10,6 +10,7 @@
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
 SET time_zone = "+00:00";
+SET FOREIGN_KEY_CHECKS=0;
 
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
@@ -786,6 +787,101 @@ CREATE TABLE `warranty_replacements` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `dataset_metadata`
+--
+
+CREATE TABLE `dataset_metadata` (
+  `id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `dataset_name` varchar(255) NOT NULL UNIQUE,
+  `description` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL COMMENT 'Reference to users.id',
+  `total_records` int(11) DEFAULT 0,
+  `last_updated_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  KEY `idx_dataset_name` (`dataset_name`),
+  CONSTRAINT `fk_dataset_metadata_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_dataset_metadata_updater` FOREIGN KEY (`last_updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Metadata and information about datasets';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employee_permissions`
+--
+
+CREATE TABLE `employee_permissions` (
+  `id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_id` int(11) NOT NULL,
+  `permission` varchar(100) NOT NULL,
+  `resource_type` varchar(50) DEFAULT NULL COMMENT 'Type of resource (dataset, table, etc)',
+  `resource_id` varchar(100) DEFAULT NULL COMMENT 'ID of specific resource',
+  `granted` tinyint(1) DEFAULT 1,
+  `granted_by` int(11) DEFAULT NULL COMMENT 'User who granted permission',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  UNIQUE KEY `unique_permission` (`user_id`, `permission`, `resource_type`, `resource_id`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_permission` (`permission`),
+  CONSTRAINT `fk_employee_permissions_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_employee_permissions_grantor` FOREIGN KEY (`granted_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Employee permissions and access control';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_orders`
+--
+
+CREATE TABLE `purchase_orders` (
+  `id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `po_number` varchar(100) NOT NULL UNIQUE,
+  `supplier_name` varchar(255) NOT NULL,
+  `po_date` date NOT NULL,
+  `expected_delivery_date` date DEFAULT NULL,
+  `actual_delivery_date` date DEFAULT NULL,
+  `total_amount` decimal(15,2) DEFAULT 0.00,
+  `status` varchar(50) NOT NULL DEFAULT 'Pending' COMMENT 'Pending, Confirmed, Received, Cancelled',
+  `notes` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL COMMENT 'Reference to users.id',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  KEY `idx_po_number` (`po_number`),
+  KEY `idx_status` (`status`),
+  KEY `idx_po_date` (`po_date`),
+  CONSTRAINT `fk_purchase_orders_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Purchase orders from suppliers';
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `security_alerts`
+--
+
+CREATE TABLE `security_alerts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_id` int(11) DEFAULT NULL COMMENT 'Reference to users.id',
+  `alert_type` varchar(100) NOT NULL COMMENT 'Type of security alert (login_attempt, permission_denied, data_access, etc)',
+  `severity` varchar(20) DEFAULT 'medium' COMMENT 'low, medium, high, critical',
+  `description` text NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` text DEFAULT NULL,
+  `status` varchar(20) DEFAULT 'active' COMMENT 'active, resolved, dismissed',
+  `resolved_by` int(11) DEFAULT NULL COMMENT 'User who resolved the alert',
+  `resolved_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_alert_type` (`alert_type`),
+  KEY `idx_severity` (`severity`),
+  KEY `idx_status` (`status`),
+  KEY `idx_created_at` (`created_at`),
+  CONSTRAINT `fk_security_alerts_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_security_alerts_resolver` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Security and audit log alerts';
+
+-- --------------------------------------------------------
+
+--
 -- Structure for view `andison_manila`
 --
 DROP TABLE IF EXISTS `andison_manila`;
@@ -912,12 +1008,6 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 -- --------------------------------------------------------
 
 --
--- Dumping data for table `users`
---
-
-INSERT INTO `users` (`id`, `name`, `email`, `password`, `role`) VALUES
-(1, 'Angeli Uybomping', 'angeli.uybomping@andisonindustrial.com', '$2y$10$LHqN1LGS85CXzhXbuLY3YOLaMpFSkjSvE1.5KfjP4K0PyDiZsHQIe', 'admin');
-
 COMMIT;
 
 --
@@ -951,13 +1041,6 @@ ALTER TABLE `delivery_records`
   ADD KEY `idx_status` (`status`),
   ADD KEY `idx_created_at` (`created_at`),
   ADD KEY `idx_owner_user_id` (`owner_user_id`);
-
---
--- Indexes for table `users`
---
-ALTER TABLE `users`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `email` (`email`);
 
 --
 -- Indexes for table `user_settings`
@@ -1025,6 +1108,8 @@ ALTER TABLE `warranty_replacements`
 ALTER TABLE `warranty_replacements`
   ADD CONSTRAINT `fk_warranty_delivery_record` FOREIGN KEY (`delivery_record_id`) REFERENCES `delivery_records` (`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 COMMIT;
+
+SET FOREIGN_KEY_CHECKS=1;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

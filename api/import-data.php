@@ -11,10 +11,35 @@ set_time_limit(300);
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
-require_once __DIR__ . '/../db_config.php';
+// Catch all PHP errors/warnings before they output and break JSON
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    // Log but don't output - return true to suppress default handler
+    error_log("API Error [$errno] in $errfile:$errline: $errstr");
+    return true;
+});
+
+// Set exception handler as fallback
+set_exception_handler(function($e) {
+    error_log("API Exception: " . $e->getMessage());
+    ob_clean();
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'System error: ' . $e->getMessage()]);
+    exit;
+});
+
+try {
+    require_once __DIR__ . '/../db_config.php';
+} catch (Throwable $e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'Database config error: ' . $e->getMessage()]);
+    exit;
+}
 
 function respond(array $d, int $code = 200): never {
-    ob_clean();
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code($code);
     echo json_encode($d);
     exit;
@@ -1224,13 +1249,14 @@ try {
     if (!empty($skipped))  $response['skipped_rows'] = array_slice($skipped, 0, 20);
     respond($response);
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
     if (isset($conn)) {
         try {
             if ($conn instanceof mysqli) $conn->rollback();
             else $conn->query('ROLLBACK');
         } catch (Throwable $_) {}
     }
+    error_log("Import API Error: " . $e->getMessage());
     respond(['success' => false, 'message' => 'Import error: ' . $e->getMessage()], 500);
 }
 ?>

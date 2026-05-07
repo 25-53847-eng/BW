@@ -511,12 +511,12 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
 
     <!-- ===== CHART PREVIEW MODAL ===== -->
     <div id="chartPreviewOverlay" onclick="closeChartPreview(event)" style="display:none;position:fixed;inset:0;z-index:9999;backdrop-filter:blur(8px);align-items:center;justify-content:center;padding:16px;box-sizing:border-box;">
-        <div id="chartPreviewBox" style="border-radius:16px;width:min(1200px,97vw);height:90vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,0.6);overflow:hidden;">
-            <div id="chartPreviewHeader" style="display:flex;align-items:center;justify-content:space-between;padding:18px 26px;flex-shrink:0;">
-                <h3 id="chartPreviewTitle" style="margin:0;font-size:18px;font-weight:700;"></h3>
-                <button id="chartPreviewCloseBtn" onclick="closeChartPreviewBtn()" style="width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;border:none;transition:background 0.2s;"><i class="fas fa-times"></i></button>
+        <div id="chartPreviewBox" style="border-radius:16px;width:min(1100px,95vw);height:72vh;max-height:800px;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,0.6);overflow:hidden;">
+            <div id="chartPreviewHeader" style="display:flex;align-items:center;justify-content:space-between;padding:20px 28px;flex-shrink:0;">
+                <h3 id="chartPreviewTitle" style="margin:0;font-size:20px;font-weight:700;flex:1;"></h3>
+                <button id="chartPreviewCloseBtn" onclick="closeChartPreviewBtn()" style="width:44px;height:44px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;border:none;transition:background 0.2s;flex-shrink:0;"><i class="fas fa-times"></i></button>
             </div>
-            <div style="padding:10px 26px 26px;flex:1;min-height:0;position:relative;">
+            <div style="padding:14px 28px 28px;flex:1;min-height:0;position:relative;">
                 <canvas id="chartPreviewCanvas" style="width:100% !important;height:100% !important;"></canvas>
             </div>
         </div>
