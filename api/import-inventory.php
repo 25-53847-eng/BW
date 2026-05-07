@@ -3,9 +3,28 @@
 header('Content-Type: application/json; charset=utf-8');
 ob_start();
 
+// Catch all PHP errors/warnings before they output and break JSON
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    error_log("API Error [$errno] in $errfile:$errline: $errstr");
+    return true;
+});
+
+// Set exception handler as fallback
+set_exception_handler(function($e) {
+    error_log("API Exception: " . $e->getMessage());
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    http_response_code(500);
+    echo json_encode(['success' => false, 'message' => 'System error: ' . $e->getMessage()]);
+    exit;
+});
+
 // Emergency response function
 function respond($success, $message, $code = 200, $data = []) {
-    ob_end_clean();
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code($code);
     echo json_encode(array_merge(['success' => $success, 'message' => $message], $data));
     exit(0);
