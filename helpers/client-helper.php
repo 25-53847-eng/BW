@@ -6,12 +6,11 @@
 
 /**
  * Get the SQL expression to resolve client company names
- * Prioritizes: sold_to > company_name (excluding internal categories)
+ * Uses company_name (excluding internal categories only, NOT to Andison Manila)
  */
 function getClientCompanyExpr(): string {
     return "NULLIF(TRIM(CASE
-                WHEN sold_to IS NOT NULL AND sold_to != '' THEN sold_to
-                WHEN company_name IS NOT NULL AND company_name != '' AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records') THEN company_name
+                WHEN company_name IS NOT NULL AND company_name != '' AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'Andison Manila') THEN company_name
                 ELSE ''
             END), '')";
 }
@@ -24,11 +23,13 @@ function getClientCompanyExpr(): string {
  * @return int Total unique client companies
  */
 function countClientCompanies($conn, $datasetFilter = '', $filterParams = []) {
+    // Get the client company expression
     $clientCompanyExpr = getClientCompanyExpr();
     
+    // Count distinct companies using the same exclusion logic as the page
     $sql = "SELECT COUNT(DISTINCT {$clientCompanyExpr}) as total 
             FROM delivery_records 
-            WHERE 1=1" . $datasetFilter;
+            WHERE {$clientCompanyExpr} IS NOT NULL" . $datasetFilter;
     
     $stmt = $conn->prepare($sql);
     if (!$stmt) {

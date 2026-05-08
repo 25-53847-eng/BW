@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare($updateSql);
         if ($stmt) {
             $stmt->bind_param(
-                'ssssiddssssiisi',
+                'ssssiddsssssiisi',
                 $supplier,
                 $orderDate,
                 $itemCode,

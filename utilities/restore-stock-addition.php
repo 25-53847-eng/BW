@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 // Extract Stock Addition records from backup and restore them

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 // Check ALL Stock Addition records

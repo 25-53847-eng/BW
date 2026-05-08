@@ -30,7 +30,7 @@ html, body {
 }
 
 body {
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     background-color: var(--color-dark-bg);
     color: var(--color-text-light);
     line-height: 1.6;
@@ -247,7 +247,7 @@ body {
     border-radius: 10px;
     padding: 12px 12px 12px 40px;
     color: var(--color-text-light);
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     font-size: 14px;
     transition: var(--transition);
     outline: none;
@@ -361,7 +361,7 @@ body {
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     transition: var(--transition);
     margin-top: 4px;
     text-transform: uppercase;
@@ -460,7 +460,7 @@ body {
     align-items: center;
     justify-content: center;
     transition: var(--transition);
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
 }
 
 .social-btn:hover {
@@ -582,7 +582,7 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     text-decoration: none;
     display: flex;
     align-items: center;
@@ -671,7 +671,7 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
 }
 
 .btn-save {

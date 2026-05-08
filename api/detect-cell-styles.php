@@ -17,7 +17,10 @@
  * }
  */
 
-// Start buffering FIRST
+// Remove ALL whitespace before headers - NO OUTPUT BEFORE HEADERS!
+while (ob_get_level() > 0) {
+    ob_end_clean();
+}
 ob_start();
 
 // Set error handling IMMEDIATELY
@@ -51,13 +54,11 @@ set_exception_handler(function($e) {
     exit;
 });
 
-// Set JSON header IMMEDIATELY
+// Set JSON header IMMEDIATELY - before any includes
 header('Content-Type: application/json; charset=utf-8');
 
-// Load PhpSpreadsheet - vendor output goes into main buffer from line 20, will be cleaned before response
+// Load PhpSpreadsheet - ensure vendor doesn't output anything
 require_once __DIR__ . '/../vendor/autoload.php';
-
-use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {

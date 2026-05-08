@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 // Check for records that might be inventory with different company_name

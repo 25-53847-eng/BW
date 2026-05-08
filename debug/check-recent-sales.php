@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 echo "=== CHECKING FOR RECENT SALES RECORDS ===\n\n";
@@ -14,9 +14,9 @@ $result = $conn->query("
 ");
 
 if($result->num_rows === 0) {
-    echo "❌ No sales records found!\n";
+    echo "? No sales records found!\n";
 } else {
-    echo "✓ Found " . $result->num_rows . " sales records:\n\n";
+    echo "? Found " . $result->num_rows . " sales records:\n\n";
     while($row = $result->fetch_assoc()) {
         echo "ID: {$row['id']}\n";
         echo "  Item: {$row['item_code']}\n";

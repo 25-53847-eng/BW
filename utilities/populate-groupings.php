@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 function inferCategory($itemName, $itemCode) {
@@ -74,16 +74,16 @@ while ($row = $r->fetch_assoc()) {
         
         if ($conn->query("UPDATE delivery_records SET groupings = '$category_safe' WHERE id = $item_id")) {
             $updated++;
-            echo "✓ ID: " . $row['id'] . " | " . $row['item_code'] . " => $category\n";
+            echo "? ID: " . $row['id'] . " | " . $row['item_code'] . " => $category\n";
         } else {
             $failed++;
-            echo "✗ Failed: ID " . $row['id'] . "\n";
+            echo "? Failed: ID " . $row['id'] . "\n";
         }
     }
 }
 
-echo "\n✓ Updated: $updated records\n";
-echo "✗ Failed: $failed records\n";
+echo "\n? Updated: $updated records\n";
+echo "? Failed: $failed records\n";
 
 // Show summary of groupings now
 echo "\n\nFinal groupings distribution (WITH sold_to):\n\n";

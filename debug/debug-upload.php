@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once '../db_config.php';
 
 echo "<h2>Data Check After Upload</h2>";

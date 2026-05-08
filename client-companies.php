@@ -168,7 +168,7 @@ foreach ($companies as $c) {
             border-radius: 8px;
             padding: 12px 16px;
             color: #e0e0e0;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
         }
         
@@ -200,7 +200,7 @@ foreach ($companies as $c) {
             border-radius: 8px;
             font-size: 12px;
             font-weight: 600;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             cursor: pointer;
             transition: all 0.3s ease;
             display: block;

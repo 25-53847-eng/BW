@@ -24,6 +24,40 @@ if ($selected_dataset !== 'all' && $selected_dataset !== '') {
     $dataset_filter = " AND dataset_name = '$safe_dataset'";
 }
 
+// Get selected year from URL or session (default to current year)
+$selected_year = isset($_GET['year']) ? intval($_GET['year']) : (isset($_SESSION['active_year']) ? intval($_SESSION['active_year']) : intval(date('Y')));
+
+// Update session if year is passed via GET
+if (isset($_GET['year'])) {
+    $_SESSION['active_year'] = $selected_year;
+}
+
+// Get available years for dropdown
+$available_years = [intval(date('Y'))];
+$r = $conn->query("SELECT DISTINCT delivery_year FROM delivery_records WHERE delivery_year > 0 AND delivery_year < 2100 ORDER BY delivery_year DESC LIMIT 50");
+if ($r) {
+    $available_years = [];
+    while ($row = $r->fetch_assoc()) {
+        $available_years[] = intval($row['delivery_year']);
+    }
+    if (empty($available_years)) {
+        $available_years = [intval(date('Y'))];
+    }
+}
+
+// Get available datasets for dropdown
+$available_datasets = [];
+$r = $conn->query("SELECT DISTINCT dataset_name FROM delivery_records WHERE dataset_name IS NOT NULL AND dataset_name != '' ORDER BY dataset_name ASC");
+if ($r) {
+    while ($row = $r->fetch_assoc()) {
+        $available_datasets[] = $row['dataset_name'];
+    }
+}
+
+// Build year filter
+$year_filter = " AND delivery_year = $selected_year";
+$combined_filter = $dataset_filter . $year_filter;
+
 // Initialize variables
 $totalAndison = 0;
 $companyCount = 0;
@@ -63,13 +97,13 @@ function isWarrantyReplacementItem($itemName, $groupings) {
 }
 
 // Total delivered to Andison (all records in delivery_records)
-$result = $conn->query("SELECT COUNT(*) as total_orders, COALESCE(SUM(quantity), 0) as total_units FROM delivery_records WHERE 1=1$dataset_filter");
+$result = $conn->query("SELECT COUNT(*) as total_orders, COALESCE(SUM(quantity), 0) as total_units FROM delivery_records WHERE sold_to = 'Andison Industrial'$combined_filter");
 if ($result && $row = $result->fetch_assoc()) {
     $totalAndison = intval($row['total_units']);
 }
 
 // Get unique companies count
-$result = $conn->query("SELECT COUNT(DISTINCT company_name) as company_count FROM delivery_records WHERE company_name IS NOT NULL AND company_name != ''$dataset_filter");
+$result = $conn->query("SELECT COUNT(DISTINCT company_name) as company_count FROM delivery_records WHERE company_name IS NOT NULL AND company_name != ''$combined_filter");
 if ($result && $row = $result->fetch_assoc()) {
     $companyCount = intval($row['company_count']);
 }
@@ -80,7 +114,7 @@ $result = $conn->query("
            COUNT(*) as order_count,
            COALESCE(SUM(quantity), 0) as total_qty
     FROM delivery_records 
-    WHERE delivery_month IS NOT NULL AND delivery_month != ''$dataset_filter
+    WHERE sold_to = 'Andison Industrial' AND delivery_month IS NOT NULL AND delivery_month != ''$combined_filter
     GROUP BY delivery_month 
     ORDER BY CASE delivery_month
         WHEN 'January' THEN 1 WHEN 'February' THEN 2 WHEN 'March' THEN 3
@@ -103,7 +137,7 @@ $result = $conn->query("
            COALESCE(SUM(quantity), 0) as total_qty
     FROM delivery_records 
     WHERE sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != '' 
-      AND (inventory_status IS NULL OR inventory_status = '')$dataset_filter
+      AND (inventory_status IS NULL OR inventory_status = '')$combined_filter
     GROUP BY sold_to 
     ORDER BY total_qty DESC 
     LIMIT 15
@@ -121,12 +155,13 @@ $result = $conn->query("
            COALESCE(SUM(quantity), 0) as total_qty,
            COUNT(DISTINCT company_name) as company_count
     FROM delivery_records 
-    WHERE item_name IS NOT NULL
+    WHERE sold_to = 'Andison Industrial'
+        AND item_name IS NOT NULL
         AND company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition')
         AND (sold_to IS NOT NULL AND sold_to != '')
         AND NOT (LOWER(TRIM(COALESCE(sold_to, ''))) IN ('stock in manila') OR LOWER(TRIM(COALESCE(sold_to, ''))) LIKE '%stock in manila%')
         AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')
-        $dataset_filter
+        $combined_filter
     GROUP BY item_name, item_code
     HAVING COALESCE(SUM(quantity), 0) > 5
     ORDER BY total_qty DESC
@@ -148,12 +183,21 @@ foreach ($productsData as $product) {
     }
 }
 
-// Prepare data for JavaScript
+// Prepare data for JavaScript - ensure all 12 months are shown
+$monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+$monthlyDataMap = [];
+
+// Create map of existing data
+foreach ($monthlyData as $row) {
+    $monthlyDataMap[$row['delivery_month']] = intval($row['total_qty']);
+}
+
+// Build complete 12-month arrays
 $monthlyLabels = [];
 $monthlyDelivered = [];
-foreach ($monthlyData as $row) {
-    $monthlyLabels[] = substr($row['delivery_month'], 0, 3);
-    $monthlyDelivered[] = intval($row['total_qty']);
+foreach ($monthNames as $monthName) {
+    $monthlyLabels[] = substr($monthName, 0, 3);
+    $monthlyDelivered[] = isset($monthlyDataMap[$monthName]) ? $monthlyDataMap[$monthName] : 0;
 }
 
 $topCompaniesJs = [];
@@ -463,9 +507,35 @@ foreach ($topCompanies as $company) {
     <!-- MAIN CONTENT -->
     <main class="main-content">
         <div class="content-wrapper">
-            <div class="page-title">
-                <i class="fas fa-chart-bar"></i>
-                <h1>Analytics Dashboard<?php echo renderDatasetIndicator($active_dataset); ?></h1>
+            <div class="page-title" style="justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <i class="fas fa-chart-bar"></i>
+                    <h1>Analytics Dashboard<?php echo renderDatasetIndicator($selected_dataset); ?></h1>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <!-- Dataset Filter Dropdown -->
+                    <?php if (!empty($available_datasets)): ?>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:13px;color:#ffffff;white-space:nowrap;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.4);background:linear-gradient(135deg, #4a7ba7 0%, #2e5c8a 100%);padding:6px 12px;border-radius:6px;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.2);">Dataset:</span>
+                        <select id="analyticsDatasetFilter" style="background:linear-gradient(135deg, #4a7ba7 0%, #2e5c8a 100%);color:#f4f8ff;border:1.5px solid rgba(255,255,255,0.15);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;outline:none;min-width:120px;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:all 0.2s ease;font-weight:500;">
+                            <option value="" <?php echo $selected_dataset === 'all' || $selected_dataset === '' ? 'selected' : ''; ?> style="background:#2e5c8a;color:#f4f8ff;">All Datasets</option>
+                            <?php foreach ($available_datasets as $ds): ?>
+                            <option value="<?php echo htmlspecialchars($ds); ?>" <?php echo $selected_dataset === $ds ? 'selected' : ''; ?> style="background:#2e5c8a;color:#f4f8ff;"><?php echo htmlspecialchars($ds); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Year Filter Dropdown -->
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:13px;color:#ffffff;white-space:nowrap;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,0.4);background:linear-gradient(135deg, #4a7ba7 0%, #2e5c8a 100%);padding:6px 12px;border-radius:6px;display:inline-block;box-shadow:0 2px 6px rgba(0,0,0,0.2);">Year:</span>
+                        <select id="analyticsYearFilter" style="background:linear-gradient(135deg, #4a7ba7 0%, #2e5c8a 100%);color:#f4f8ff;border:1.5px solid rgba(255,255,255,0.15);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;outline:none;min-width:80px;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:all 0.2s ease;font-weight:500;">
+                            <?php foreach ($available_years as $y): ?>
+                            <option value="<?php echo $y; ?>" <?php echo $selected_year === $y ? 'selected' : ''; ?> style="background:#2e5c8a;color:#f4f8ff;"><?php echo $y; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <!-- KEY METRICS SECTION -->
@@ -691,6 +761,32 @@ foreach ($topCompanies as $company) {
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOMContentLoaded event fired');
         
+            // Handle dataset filter change
+            const datasetFilter = document.getElementById('analyticsDatasetFilter');
+            if (datasetFilter) {
+                datasetFilter.addEventListener('change', function() {
+                    const selectedDataset = this.value;
+                    const year = new URLSearchParams(window.location.search).get('year') || new Date().getFullYear();
+                    
+                    // Redirect to same page with new dataset parameter
+                    const newUrl = window.location.pathname + '?year=' + encodeURIComponent(year) + (selectedDataset ? '&dataset=' + encodeURIComponent(selectedDataset) : '');
+                    window.location.href = newUrl;
+                });
+            }
+        
+            // Handle year filter change
+            const yearFilter = document.getElementById('analyticsYearFilter');
+            if (yearFilter) {
+                yearFilter.addEventListener('change', function() {
+                    const selectedYear = this.value;
+                    const dataset = new URLSearchParams(window.location.search).get('dataset') || '';
+                    
+                    // Redirect to same page with new year parameter
+                    const newUrl = window.location.pathname + '?year=' + encodeURIComponent(selectedYear) + (dataset ? '&dataset=' + encodeURIComponent(dataset) : '');
+                    window.location.href = newUrl;
+                });
+            }
+        
             // Initialize charts with real data
             const maxAndison = Math.max(analyticsData.totalAndison + 100, 800);
             const maxCompanies = Math.max(analyticsData.companyCount + 50, 100);
@@ -702,7 +798,7 @@ foreach ($topCompanies as $company) {
             monthlyTrendChartInstance = new Chart(monthlyTrendCtx, {
             type: 'line',
             data: {
-                labels: analyticsData.monthlyLabels.length > 0 ? analyticsData.monthlyLabels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+                labels: analyticsData.monthlyLabels.length > 0 ? analyticsData.monthlyLabels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 datasets: [
                     {
                         label: 'Units Delivered',
@@ -746,7 +842,7 @@ foreach ($topCompanies as $company) {
         monthlyBarChartInstance = new Chart(monthlyBarCtx, {
             type: 'bar',
             data: {
-                labels: analyticsData.monthlyLabels.length > 0 ? analyticsData.monthlyLabels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
+                labels: analyticsData.monthlyLabels.length > 0 ? analyticsData.monthlyLabels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
                 datasets: [
                     {
                         label: 'Units Delivered',

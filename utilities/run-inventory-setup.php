@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 // Drop existing inventory objects if they exist
@@ -22,9 +22,9 @@ if($conn->query("
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
 ")) {
-    echo "✓ Inventory table ready\n";
+    echo "? Inventory table ready\n";
 } else {
-    echo "✗ Error with inventory table: " . $conn->error . "\n";
+    echo "? Error with inventory table: " . $conn->error . "\n";
 }
 
 // Create purchase_orders table
@@ -49,16 +49,16 @@ if($conn->query("
         INDEX (owner_user_id)
     )
 ")) {
-    echo "✓ Purchase orders table ready\n";
+    echo "? Purchase orders table ready\n";
 } else {
-    echo "✗ Error creating purchase_orders table: " . $conn->error . "\n";
+    echo "? Error creating purchase_orders table: " . $conn->error . "\n";
 }
 
 // Create indexes with IF NOT EXISTS handling
 @$conn->query("CREATE INDEX IF NOT EXISTS idx_inventory_item_code ON inventory(item_code)");
 @$conn->query("CREATE INDEX IF NOT EXISTS idx_po_item_code ON purchase_orders(item_code)");
 @$conn->query("CREATE INDEX IF NOT EXISTS idx_po_status ON purchase_orders(status)");
-echo "✓ Indexes ready\n";
+echo "? Indexes ready\n";
 
 // Now create triggers using multi_query
 $triggers_sql = "
@@ -94,12 +94,12 @@ if($conn->multi_query($triggers_sql)) {
             $result->free();
         }
     } while($conn->next_result());
-    echo "✓ Created triggers\n";
+    echo "? Created triggers\n";
 } else {
-    echo "✗ Error creating triggers: " . $conn->error . "\n";
+    echo "? Error creating triggers: " . $conn->error . "\n";
 }
 
-echo "\n✓✓✓ Database setup complete! ✓✓✓\n";
+echo "\n??? Database setup complete! ???\n";
 echo "\nInventory system ready to go!\n";
 ?>
 

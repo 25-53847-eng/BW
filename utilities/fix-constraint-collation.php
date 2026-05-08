@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * Fix UNIQUE Constraint Collation Issue
  */
@@ -21,9 +21,9 @@ try {
     }
     
     if($has_unique) {
-        echo "\n⚠ Found UNIQUE constraint. Dropping it...\n";
+        echo "\n? Found UNIQUE constraint. Dropping it...\n";
         $conn->query("ALTER TABLE delivery_records DROP INDEX unique_delivery");
-        echo "✓ UNIQUE constraint dropped\n";
+        echo "? UNIQUE constraint dropped\n";
         
         // Recreate with explicit COLLATE
         echo "\nRecreating UNIQUE constraint with utf8mb4_unicode_ci...\n";
@@ -36,16 +36,16 @@ try {
         )");
         
         if($result) {
-            echo "✓ UNIQUE constraint recreated\n";
+            echo "? UNIQUE constraint recreated\n";
         } else {
-            echo "⚠ Note: UNIQUE might already exist - " . $conn->error . "\n";
+            echo "? Note: UNIQUE might already exist - " . $conn->error . "\n";
         }
     }
     
-    echo "\n✅ Constraint fix complete!\n";
+    echo "\n? Constraint fix complete!\n";
 
 } catch (Exception $e) {
-    echo "❌ Error: " . $e->getMessage() . "\n";
+    echo "? Error: " . $e->getMessage() . "\n";
 }
 
 $conn->close();

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 // First migration - catch all without dataset_name check

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once '../db_config.php';
 
 $sql = "SELECT owner_user_id, COUNT(*) as cnt FROM delivery_records WHERE company_name = 'Stock Addition' GROUP BY owner_user_id";

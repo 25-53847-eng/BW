@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 $item_code = 'MC2-FPCB1';
@@ -25,7 +25,7 @@ if ($row['cnt'] > 0) {
         echo "- Company: " . $row['company_name'] . ", Qty: " . $row['quantity'] . ", Sold_to: [" . ($row['sold_to'] ?? 'NULL') . "]\n";
     }
 } else {
-    echo "✓ All records properly consolidated!\n";
+    echo "? All records properly consolidated!\n";
 }
 
 echo "\n244 + 5 = 249. Is there a specific place where the 5 units should have come from?\n";

@@ -168,7 +168,7 @@ if (empty($userEmail)) {
             background: rgba(8, 14, 24, 0.62);
             color: #ffffff;
             padding: 11px 12px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             outline: none;
         }
@@ -188,7 +188,7 @@ if (empty($userEmail)) {
             padding: 10px 16px;
             font-size: 13px;
             font-weight: 600;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             cursor: pointer;
             transition: 0.2s ease;
         }
@@ -298,7 +298,7 @@ if (empty($userEmail)) {
             text-transform: uppercase;
             letter-spacing: 0.5px;
             transition: all 0.3s ease;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
         .btn-edit {
             background: linear-gradient(135deg, #2f5fa7, #1e3c72);

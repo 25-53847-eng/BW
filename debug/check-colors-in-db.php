@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 echo "Checking highlight_color in database:\n\n";

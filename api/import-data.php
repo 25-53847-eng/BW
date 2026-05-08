@@ -822,7 +822,7 @@ try {
             $quantity = isset($mapped['quantity']) ? intval($mapped['quantity']) : 0;
             $serial_no = isset($mapped['serial_no']) ? trim(strval($mapped['serial_no'])) : '';
             $notes = isset($mapped['notes']) ? trim(strval($mapped['notes'])) : '';
-            $company_name = isset($mapped['company_name']) ? trim(strval($mapped['company_name'])) : 'Andison Industrial';
+            $company_name = isset($mapped['company_name']) ? trim(strval($mapped['company_name'])) : '';
             $sold_to = isset($mapped['sold_to']) ? trim(strval($mapped['sold_to'])) : '';
             $status = isset($mapped['status']) ? trim(strval($mapped['status'])) : 'Delivered';
             $uom = isset($mapped['uom']) ? trim(strval($mapped['uom'])) : '';
@@ -850,20 +850,22 @@ try {
                         $sold_to = $inventory_marker; // Store the marker (usually "INVENTORY")
                     }
                 } else {
-                    // No marker → Default to Stock Addition
+                    // No marker and no sold_to → Default to Stock Addition (inventory staging)
                     $company_name = 'Stock Addition';
                     $sold_to = '';
                 }
             } else {
+                // sold_to has a value - check what type
                 $sold_to_lower = strtolower(trim($sold_to));
                 // Check if sold_to contains Andison Manila or Stock in Manila variations
-                // ONLY route to Andison Manila if sold_to explicitly mentions 'andison' or 'stock in manila'
-                // Do NOT route just because it contains 'manila' (other companies like Kunimori Engineering Works-Manila should not route here)
                 if (strpos($sold_to_lower, 'andison') !== false || strpos($sold_to_lower, 'andiso') !== false || 
                     strpos($sold_to_lower, 'stock in manila') !== false) {
-                    // Route to Andison Manila
+                    // Route to Andison Manila (internal routing)
                     $company_name = 'to Andison Manila';
                     // Keep sold_to as-is so we can see the original designation
+                } else {
+                    // Valid client company name in sold_to - use it as company_name
+                    $company_name = $sold_to;
                 }
             }
             // Year starts at 0; will be filled from explicit YEAR column, delivery_date, or current year
@@ -960,6 +962,12 @@ try {
             $sold_to_month = isset($mapped['sold_to_month']) ? trim(strval($mapped['sold_to_month'])) : '';
             $sold_to_day = isset($mapped['sold_to_day']) ? intval($mapped['sold_to_day']) : 0;
             $groupings = isset($mapped['groupings']) ? trim(strval($mapped['groupings'])) : '';
+            
+            // If groupings is empty but unit_type is provided, use unit_type as groupings
+            if (empty($groupings) && !empty($unit_type)) {
+                $groupings = $unit_type;
+            }
+            
             $highlight_color = isset($mapped['highlight_color']) ? trim(strval($mapped['highlight_color'])) : '';
             $cell_styles = '';
 
@@ -1221,17 +1229,18 @@ try {
                 $warranty_flag = 1;
                 $red_text_detected = 1;
                 $last_id = null; // Use NULL instead of 0 to satisfy foreign key constraint
+                $owner_user_id = intval($_SESSION['user_id'] ?? 0);
                 
                 $warranty_sql = "INSERT INTO warranty_replacements 
                     (delivery_record_id, invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, 
                      item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, 
-                     dataset_name, warranty_flag, warranty_date, red_text_detected)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     dataset_name, warranty_flag, warranty_date, red_text_detected, owner_user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 
                 $warranty_stmt = $conn->prepare($warranty_sql);
                 if ($warranty_stmt) {
                     $warranty_stmt->bind_param(
-                        'issiiissssssissssssssi',
+                        'issiiissssssissssssssii',
                         $last_id,
                         $invoice_no,
                         $serial_no,
@@ -1253,7 +1262,8 @@ try {
                         $dataset_name,
                         $warranty_flag,
                         $warranty_date,
-                        $red_text_detected
+                        $red_text_detected,
+                        $owner_user_id
                     );
                     
                     if (!$warranty_stmt->execute()) {

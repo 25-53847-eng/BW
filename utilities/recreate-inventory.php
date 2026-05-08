@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 // Get all records where sold_to is NULL or empty (these should be inventory)
@@ -88,8 +88,8 @@ while ($row = $result->fetch_assoc()) {
 }
 
 echo "Inventory Recreation Complete!\n";
-echo "✓ Created: $created_count new Stock Addition records\n";
-echo "⊘ Updated: $duplicate_count existing records\n";
+echo "? Created: $created_count new Stock Addition records\n";
+echo "? Updated: $duplicate_count existing records\n";
 
 // Verify
 $verify = $conn->query("SELECT COUNT(*) as cnt, COALESCE(SUM(quantity), 0) as total 
@@ -97,7 +97,7 @@ $verify = $conn->query("SELECT COUNT(*) as cnt, COALESCE(SUM(quantity), 0) as to
                         WHERE company_name = 'Stock Addition'");
 
 if ($verify && $row = $verify->fetch_assoc()) {
-    echo "\n✓ Verification:\n";
+    echo "\n? Verification:\n";
     echo "  Total Stock Addition records: " . $row['cnt'] . "\n";
     echo "  Total inventory quantity: " . $row['total'] . "\n";
 }

@@ -23,14 +23,9 @@ try {
     $months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     $monthly_sales = array_fill_keys($months, 0);
     
-    // Build where clause based on role
-    if ($user_role === 'employee') {
-        $where = "WHERE YEAR(delivery_date) = ? AND delivery_month IS NOT NULL AND delivery_month != '' AND unit_type IN ('1a', '2a', '4a')";
-        $params = [$year];
-    } else {
-        $where = "WHERE owner_user_id = ? AND YEAR(delivery_date) = ? AND delivery_month IS NOT NULL AND delivery_month != '' AND unit_type IN ('1a', '2a', '4a')";
-        $params = [$user_id, $year];
-    }
+    // All users (admin and employee) see all data
+    $where = "WHERE YEAR(delivery_date) = ? AND delivery_month IS NOT NULL AND delivery_month != '' AND unit_type IN ('1a', '2a', '4a')";
+    $params = [$year];
     
     // Add dataset filter if provided
     if (!empty($dataset)) {

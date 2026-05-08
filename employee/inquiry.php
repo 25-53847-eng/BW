@@ -8,8 +8,8 @@ if (empty($_SESSION['user_id'])) {
 
 require_once 'db_config.php';
 require_once 'dataset-indicator.php';
-require_once '../api/dataset-status-helper.php';
-require_once '../api/permission-helper.php';
+require_once 'api/dataset-status-helper.php';
+require_once 'api/permission-helper.php';
 
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 echo "Sample records with colors and their rendering:\n\n";
@@ -10,7 +10,7 @@ while ($row = $r->fetch_assoc()) {
     
     // Check if it matches the regex
     if (preg_match('/^#?[0-9a-fA-F]{6}$/', $highlight_color)) {
-        echo "✓ ID: " . $row['id'] . ", Color: $highlight_color => VALID HEX\n";
+        echo "? ID: " . $row['id'] . ", Color: $highlight_color => VALID HEX\n";
         
         // Show what RGBA value would be generated
         if ($highlight_color[0] !== '#') {
@@ -23,7 +23,7 @@ while ($row = $r->fetch_assoc()) {
         $rgba_soft = sprintf('rgba(%d, %d, %d, 0.18)', $r_comp, $g_comp, $b_comp);
         echo "  RGBA(soft): $rgba_soft\n";
     } else {
-        echo "✗ ID: " . $row['id'] . ", Color: $highlight_color => INVALID HEX (doesn't match regex)\n";
+        echo "? ID: " . $row['id'] . ", Color: $highlight_color => INVALID HEX (doesn't match regex)\n";
     }
 }
 ?>

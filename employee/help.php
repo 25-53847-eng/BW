@@ -4,7 +4,7 @@ session_start();
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php', true, 302);
     exit;
-} 
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -68,7 +68,7 @@ if (empty($_SESSION['user_id'])) {
             border: 2px solid rgba(255, 255, 255, 0.1);
             background: rgba(255, 255, 255, 0.05);
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 15px;
             transition: all 0.3s ease;
         }

@@ -14,9 +14,8 @@ require_once __DIR__ . '/../db_config.php';
 
 $user_id = intval($_SESSION['user_id']);
 
-// SUPER SIMPLE: Just get distinct years from the database
-// No complex filtering, no joins, no subqueries
-$sql = "SELECT DISTINCT delivery_year FROM delivery_records WHERE owner_user_id = ? AND delivery_year > 0 AND delivery_year < 2100 ORDER BY delivery_year DESC LIMIT 50";
+// Get distinct years from database - show all years to all users
+$sql = "SELECT DISTINCT delivery_year FROM delivery_records WHERE delivery_year > 0 AND delivery_year < 2100 ORDER BY delivery_year DESC LIMIT 50";
 
 $stmt = $conn->prepare($sql);
 if (!$stmt) {
@@ -26,9 +25,7 @@ if (!$stmt) {
     exit();
 }
 
-$stmt->bind_param('i', $user_id);
-
-// Execute and check for errors
+// No bind_param needed since we're not filtering by user
 if (!$stmt->execute()) {
     ob_end_clean();
     header('Content-Type: application/json');

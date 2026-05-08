@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 $owner_user_id = $_SESSION['user_id'] ?? 18;

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 // Check serial_no column
@@ -6,9 +6,9 @@ $result = $conn->query("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE
 
 if ($result && $result->num_rows > 0) {
     $row = $result->fetch_assoc();
-    echo "✓ serial_no column exists: " . $row['COLUMN_TYPE'] . "\n";
+    echo "? serial_no column exists: " . $row['COLUMN_TYPE'] . "\n";
 } else {
-    echo "✗ serial_no column does NOT exist!\n";
+    echo "? serial_no column does NOT exist!\n";
 }
 
 // Check if there are any non-empty serial numbers at all

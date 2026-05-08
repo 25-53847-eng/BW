@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 // Set password to 'test123' for admin user

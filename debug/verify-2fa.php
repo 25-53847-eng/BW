@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 
 // If already fully authenticated, redirect to profile
@@ -42,7 +42,7 @@ if (empty($_SESSION['pending_2fa_user_id'])) {
             border-radius: 12px;
             background: rgba(255, 255, 255, 0.05);
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             transition: all 0.3s ease;
         }
         .code-input:focus {

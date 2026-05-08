@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 echo "=== CHECKING INVENTORY TABLE ===\n\n";
@@ -24,11 +24,11 @@ if($dr_item_code) {
 }
 
 if($item_code && $item_code['COLLATION_NAME'] !== $dr_item_code['COLLATION_NAME']) {
-    echo "\n⚠️ COLLATION MISMATCH FOUND!\n";
+    echo "\n?? COLLATION MISMATCH FOUND!\n";
     echo "  inventory.item_code: {$item_code['COLLATION_NAME']}\n";
     echo "  delivery_records.item_code: {$dr_item_code['COLLATION_NAME']}\n";
 } else {
-    echo "\n✓ Collations match\n";
+    echo "\n? Collations match\n";
 }
 
 $conn->close();

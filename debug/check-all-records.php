@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once '../db_config.php';
 
 // Check all records without user filter

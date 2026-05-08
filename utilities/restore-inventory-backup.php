@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 $backup_file = __DIR__ . '/backups/backup_2026-03-23_06-47-42.sql';
@@ -46,11 +46,11 @@ if (count($errors) > 0) {
 // Verify restoration
 $check = $conn->query("SELECT COUNT(*) as cnt, SUM(quantity) as total_qty FROM delivery_records WHERE company_name = 'Stock Addition'");
 if ($check && $row = $check->fetch_assoc()) {
-    echo "\n✓ Verification:\n";
+    echo "\n? Verification:\n";
     echo "  Stock Addition records: " . $row['cnt'] . "\n";
     echo "  Total inventory quantity: " . ($row['total_qty'] ?? 0) . "\n";
 } else {
-    echo "\n✗ Verification failed\n";
+    echo "\n? Verification failed\n";
 }
 
 $conn->close();

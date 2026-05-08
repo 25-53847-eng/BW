@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 // Get all unique client companies (same as in andison-manila.php)
@@ -13,14 +13,14 @@ $clientResult = $conn->query("
 ");
 
 if ($clientResult && $clientResult->num_rows > 0) {
-    echo "✓ Found " . $clientResult->num_rows . " unique client companies for dropdown:\n\n";
+    echo "? Found " . $clientResult->num_rows . " unique client companies for dropdown:\n\n";
     $count = 1;
     while ($row = $clientResult->fetch_assoc()) {
         echo "  $count. " . $row['company'] . "\n";
         $count++;
     }
 } else {
-    echo "ℹ No client companies yet. These will appear in dropdown once you add sales!\n";
+    echo "? No client companies yet. These will appear in dropdown once you add sales!\n";
 }
 
 $conn->close();

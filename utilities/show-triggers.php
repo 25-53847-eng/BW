@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once '../db_config.php';
 
 echo "=== TRIGGER DEFINITIONS ===\n\n";

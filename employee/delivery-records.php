@@ -1,9 +1,5 @@
 <?php
 session_start();
-if (!isset($_SESSION['user_role'])) {
-    $_SESSION['user_role'] = 'employee';
-}
-
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php', true, 302);
     exit;
@@ -11,21 +7,14 @@ if (empty($_SESSION['user_id'])) {
 
 // Include database configuration
 require_once 'db_config.php';
+require_once 'api/permission-helper.php';
 
 // Include dataset indicator helper
 require_once 'dataset-indicator.php';
-require_once '../api/dataset-status-helper.php';
+require_once 'api/dataset-status-helper.php';
 
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
-
-// Include permission helper for access control
-require_once '../api/permission-helper.php';
-
-// Check permission for adding delivery records
-$canAddDelivery = isPermissionEnabled('delivery_add_records', $conn);
-$canEditDelivery = isPermissionEnabled('delivery_edit_records', $conn);
-$canDeleteDelivery = isPermissionEnabled('delivery_delete_records', $conn);
 
 function isLegendMarkerRow(array $row): bool {
     $groupings = strtolower(trim((string) ($row['groupings'] ?? '')));
@@ -169,21 +158,35 @@ if ($selected_dataset !== 'all' && $selected_dataset !== '') {
 }
 
 $owner_user_id = intval($_SESSION['user_id'] ?? 0);
-$owner_filter = "owner_user_id = {$owner_user_id} AND ";
+// Employees should see all delivery records uploaded by admin, not just their own
+$owner_filter = "";
 
 // Delivery Records page should never include:
 // 1. Inquiry/order staging rows or Andison Manila transfers
-// 2. Warranty replacement records (those go to warranty-items page)
+// 2. Warranty replacement records (identified by highlight_color in warranty-related colors: red, teal, pink)
+// Warranty colors: red (#EF4444, #FF0000, #DC2626, #FFC7CE, #F8CBAD, #F4AAAA, #C0504D),
+//                  teal (#14B8A6, #B7DEE8, #A7E3DE, #9DD9D2, #4BACC6),
+//                  pink (#EC4899, #E79CC8, #F4B6D7, #F8C8DC, #FF99CC)
+$warranty_colors = [
+    '#EF4444', '#FF0000', '#DC2626', '#FFC7CE', '#F8CBAD', '#F4AAAA', '#C0504D', // red
+    '#14B8A6', '#B7DEE8', '#A7E3DE', '#9DD9D2', '#4BACC6', // teal
+    '#EC4899', '#E79CC8', '#F4B6D7', '#F8C8DC', '#FF99CC' // pink
+];
+
+// Escape warranty colors for SQL query
+if (isset($conn) && $conn) {
+    $warranty_colors_escaped = array_map(fn($c) => "'" . $conn->real_escape_string($c) . "'", $warranty_colors);
+} else {
+    // Fallback: manually escape with quotes (connection should always be available)
+    $warranty_colors_escaped = array_map(fn($c) => "'" . str_replace("'", "''", $c) . "'", $warranty_colors);
+}
+$warranty_colors_list = implode(',', $warranty_colors_escaped);
+
 $delivery_where = "{$owner_filter}company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition') AND NOT (
-    LOWER(TRIM(COALESCE(company_name, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
-    OR LOWER(TRIM(COALESCE(transferred_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
-    OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
-) AND NOT (
-    LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%'
-    OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty to purchase%'
-    OR LOWER(TRIM(COALESCE(groupings, ''))) = '3a'
-    OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%purchase to warranty%'
-)";
+    LOWER(TRIM(COALESCE(company_name, ''))) IN ('andison manila', 'to andison manila')
+    OR LOWER(TRIM(COALESCE(transferred_to, ''))) IN ('andison manila', 'to andison manila')
+    OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila')
+) AND COALESCE(highlight_color, '') NOT IN ({$warranty_colors_list})";
 
 // Get statistics from database
 $stats = [
@@ -229,7 +232,7 @@ if ($result) {
 // Get distinct dataset names (data1, data2, ...)
 $datasets = [];
 try {
-    $dsResult = $conn->query("SELECT DISTINCT dataset_name FROM delivery_records WHERE owner_user_id = {$owner_user_id} AND dataset_name IS NOT NULL AND dataset_name != '' ORDER BY dataset_name ASC");
+    $dsResult = $conn->query("SELECT DISTINCT dataset_name FROM delivery_records WHERE dataset_name IS NOT NULL AND dataset_name != '' ORDER BY dataset_name ASC");
     if ($dsResult) {
         while ($row = $dsResult->fetch_assoc()) {
             $datasets[] = $row['dataset_name'];
@@ -244,8 +247,7 @@ $allItems = [];
 $itemResult = $conn->query("
     SELECT DISTINCT item_code, item_name
     FROM delivery_records
-        WHERE owner_user_id = {$owner_user_id}
-            AND item_code IS NOT NULL 
+        WHERE item_code IS NOT NULL 
       AND item_code != ''
       AND item_name IS NOT NULL
       AND item_name != ''
@@ -273,8 +275,7 @@ if (empty($allItems)) {
     $inventoryResult = $conn->query("
         SELECT DISTINCT item_code, item_name
         FROM delivery_records
-                WHERE owner_user_id = {$owner_user_id}
-                    AND company_name = 'Stock Addition'
+                WHERE company_name = 'Stock Addition'
           AND item_code IS NOT NULL 
           AND item_code != ''
           AND item_name IS NOT NULL
@@ -294,6 +295,26 @@ if (empty($allItems)) {
                     'name' => $name
                 ];
             }
+        }
+    }
+}
+
+// Get all unique unit types for filter dropdown
+$allUnitTypes = [];
+$unitTypeResult = $conn->query("
+    SELECT DISTINCT unit_type
+    FROM delivery_records
+    WHERE unit_type IS NOT NULL 
+        AND unit_type != ''
+        $dataset_filter
+    ORDER BY unit_type ASC
+");
+
+if ($unitTypeResult) {
+    while ($row = $unitTypeResult->fetch_assoc()) {
+        $unitType = trim($row['unit_type']);
+        if (!empty($unitType)) {
+            $allUnitTypes[] = $unitType;
         }
     }
 }
@@ -342,7 +363,7 @@ if (empty($allItems)) {
             border: 1px solid rgba(255, 255, 255, 0.1);
             background: rgba(255, 255, 255, 0.05);
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             transition: all 0.3s ease;
         }
@@ -404,7 +425,7 @@ if (empty($allItems)) {
             padding: 10px 14px;
             font-size: 12px;
             font-weight: 600;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             display: inline-flex;
             align-items: center;
             gap: 8px;
@@ -455,7 +476,7 @@ if (empty($allItems)) {
             padding: 6px 10px;
             font-size: 11px;
             cursor: pointer;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
 
         .filter-action-btn:hover {
@@ -472,7 +493,7 @@ if (empty($allItems)) {
 
         .filter-option {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 8px;
             width: 100%;
             padding: 8px;
@@ -483,7 +504,7 @@ if (empty($allItems)) {
             color: #d4dfeb;
             font-size: 12px;
             text-align: left;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
 
         .filter-option:hover {
@@ -601,7 +622,7 @@ if (empty($allItems)) {
             padding: 10px 16px;
             border-radius: 8px;
             cursor: pointer;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 12px;
             transition: all 0.3s ease;
         }
@@ -841,15 +862,15 @@ if (empty($allItems)) {
         }
         
         .summary-card {
-            background: linear-gradient(135deg, #1e2a38 0%, #2a3f5f 100%);
+            background: linear-gradient(145deg, #ffffff, #f8f9fa);
             padding: 20px;
             border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid #c5ddf0;
         }
         
         .summary-label {
             font-size: 11px;
-            color: #a0a0a0;
+            color: #5a6a7a;
             text-transform: uppercase;
             margin-bottom: 8px;
         }
@@ -857,7 +878,7 @@ if (empty($allItems)) {
         .summary-value {
             font-size: 24px;
             font-weight: 700;
-            color: #fff;
+            color: #1a3a5c;
         }
         
         @media (max-width: 768px) {
@@ -897,13 +918,13 @@ if (empty($allItems)) {
         }
 
         .modal-content {
-            background: linear-gradient(135deg, #1e2a38 0%, #2a3f5f 100%);
+            background: linear-gradient(145deg, #ffffff, #f8f9fa);
             padding: 30px;
             border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            border: 2px solid #2c5aa0;
             width: 90%;
             max-width: 560px;
-            color: #e0e0e0;
+            color: #333;
         }
 
         /* Larger modal for Add Record */
@@ -921,12 +942,12 @@ if (empty($allItems)) {
         }
         
         .modal-content.modal-large::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(44, 90, 160, 0.08);
             border-radius: 3px;
         }
         
         .modal-content.modal-large::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(44, 90, 160, 0.3);
             border-radius: 3px;
         }
 
@@ -935,12 +956,12 @@ if (empty($allItems)) {
             justify-content: space-between;
             align-items: center;
             margin-bottom: 25px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 2px solid #2c5aa0;
             padding-bottom: 15px;
         }
 
         .modal-header h2 {
-            color: #fff;
+            color: #1e3a8a;
             margin: 0;
             font-size: 18px;
             letter-spacing: 0.3px;
@@ -949,14 +970,14 @@ if (empty($allItems)) {
         .close-btn {
             background: none;
             border: none;
-            color: #a0a0a0;
+            color: #2c5aa0;
             font-size: 28px;
             cursor: pointer;
             transition: color 0.3s ease;
         }
 
         .close-btn:hover {
-            color: #fff;
+            color: #1e3a8a;
         }
 
         .modal-body {
@@ -972,7 +993,7 @@ if (empty($allItems)) {
 
         .modal-label {
             font-size: 11px;
-            color: #a0a0a0;
+            color: #5a6a7a;
             text-transform: uppercase;
             margin-bottom: 6px; 
             letter-spacing: 0.5px;
@@ -981,7 +1002,7 @@ if (empty($allItems)) {
 
         .modal-value {
             font-size: 14px;
-            color: #fff;
+            color: #1a3a5c;
             font-weight: 600;
         }
 
@@ -1025,7 +1046,7 @@ if (empty($allItems)) {
             border: none;
             padding: 12px 20px;
             border-radius: 8px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
@@ -1051,7 +1072,7 @@ if (empty($allItems)) {
             border: none;
             padding: 12px 20px;
             border-radius: 8px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
@@ -1102,7 +1123,7 @@ if (empty($allItems)) {
             border: 1px solid rgba(255, 255, 255, 0.15);
             background: rgba(255, 255, 255, 0.08);
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             transition: all 0.3s ease;
             width: 100%;
@@ -1154,7 +1175,7 @@ if (empty($allItems)) {
             border: none;
             padding: 12px 28px;
             border-radius: 8px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
@@ -1172,7 +1193,7 @@ if (empty($allItems)) {
             border: none;
             padding: 12px 28px;
             border-radius: 8px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             font-weight: 600;
             cursor: pointer;
@@ -1270,14 +1291,14 @@ if (empty($allItems)) {
         }
 
         .delete-modal-content {
-            background: linear-gradient(145deg, #1e2a38, #16202c);
+            background: linear-gradient(145deg, #ffffff, #f8f9fa);
             border-radius: 16px;
             padding: 35px 40px;
             max-width: 450px;
             width: 90%;
             text-align: center;
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 2px solid #2c5aa0;
         }
 
         .delete-modal-icon {
@@ -1289,19 +1310,19 @@ if (empty($allItems)) {
         .delete-modal-title {
             font-size: 22px;
             font-weight: 600;
-            color: #fff;
+            color: #1e3a8a;
             margin-bottom: 12px;
         }
 
         .delete-modal-message {
             font-size: 15px;
-            color: #a0a0a0;
+            color: #5a6a7a;
             margin-bottom: 30px;
             line-height: 1.5;
         }
 
         .delete-modal-message strong {
-            color: #f4d03f;
+            color: #2c5aa0;
         }
 
         .delete-modal-actions {
@@ -1411,6 +1432,60 @@ if (empty($allItems)) {
             background: #d0e7f7;
         }
 
+        /* Light mode modal styles */
+        html.light-mode .modal-content,
+        body.light-mode .modal-content {
+            background: linear-gradient(145deg, #ffffff, #f8f9fa) !important;
+            border: 2px solid #2c5aa0 !important;
+            color: #333 !important;
+        }
+
+        html.light-mode .modal-header,
+        body.light-mode .modal-header {
+            border-bottom: 2px solid #2c5aa0 !important;
+        }
+
+        html.light-mode .modal-header h2,
+        body.light-mode .modal-header h2 {
+            color: #1e3a8a !important;
+        }
+
+        html.light-mode .close-btn,
+        body.light-mode .close-btn {
+            color: #2c5aa0 !important;
+        }
+
+        html.light-mode .close-btn:hover,
+        body.light-mode .close-btn:hover {
+            color: #1e3a8a !important;
+        }
+
+        html.light-mode .modal-label,
+        body.light-mode .modal-label {
+            color: #5a6a7a !important;
+        }
+
+        html.light-mode .modal-value,
+        body.light-mode .modal-value {
+            color: #1a3a5c !important;
+        }
+
+        html.light-mode .summary-card,
+        body.light-mode .summary-card {
+            background: linear-gradient(145deg, #ffffff, #f8f9fa) !important;
+            border: 1px solid #c5ddf0 !important;
+        }
+
+        html.light-mode .summary-label,
+        body.light-mode .summary-label {
+            color: #5a6a7a !important;
+        }
+
+        html.light-mode .summary-value,
+        body.light-mode .summary-value {
+            color: #1a3a5c !important;
+        }
+
         /* Andison rows should not be auto-highlighted; color comes only from row/cell styles. */
         tr.andison-manila-row,
         html.light-mode tr.andison-manila-row,
@@ -1509,7 +1584,7 @@ if (empty($allItems)) {
             color: #fff;
             font-size: 16px;
             font-weight: 600;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             letter-spacing: 1px;
         }
 
@@ -1601,6 +1676,18 @@ if (empty($allItems)) {
             <i class="fas fa-truck"></i> Delivery Records
         </div>
         
+        <!-- Dataset Indicator Banner -->
+        <div style="background: linear-gradient(90deg, #f0f4f8 0%, #ffffff 100%); border-left: 4px solid #2c5aa0; padding: 12px 16px; margin-bottom: 20px; border-radius: 6px; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-database" style="color: #2c5aa0; font-size: 14px;"></i>
+            <span style="color: #5a6a7a; font-size: 12px;">Current Dataset:</span>
+            <strong style="color: #1a3a5c; font-size: 13px;"><?php echo $selected_dataset === 'all' ? 'ALL DATA' : htmlspecialchars(strtoupper($selected_dataset)); ?></strong>
+            <?php if ($selected_dataset !== 'all'): ?>
+            <a href="delivery-records.php" style="margin-left: auto; color: #2c5aa0; font-size: 12px; text-decoration: none; opacity: 0.8; transition: opacity .2s;" title="View all datasets">
+                <i class="fas fa-times-circle"></i> Clear
+            </a>
+            <?php endif; ?>
+        </div>
+
         <!-- Summary -->
         <div class="summary-grid">
             <div class="summary-card">
@@ -1639,31 +1726,31 @@ if (empty($allItems)) {
             <button class="btn-export" onclick="exportToExcel()">
                 <i class="fas fa-file-excel"></i> Export
             </button>
-            <?php if ($canAddDelivery && $dataset_is_enabled): ?>
+            <?php if ($dataset_is_enabled && isPermissionEnabled('delivery_add_records', $conn)): ?>
             <button class="btn-add-record" onclick="openAddModal()">
                 <i class="fas fa-plus"></i> Add Record
             </button>
             <?php endif; ?>
         </div>
 
-        <!-- Grouping Filters -->
-        <div class="filters" id="colorFilters">
+        <!-- Unit Type Filter -->
+        <div class="filters" id="unitTypeFilters">
             <div class="filter-panel">
-                <label class="filter-title"><i class="fas fa-filter"></i> Filter Groupings</label>
-                <div class="filter-dropdown" id="categoryFilterDropdown">
-                    <button type="button" class="filter-toggle-btn" id="categoryFilterToggle" onclick="toggleCategoryFilterDropdown()">
-                        <span id="categoryFilterSummary">All filters</span>
+                <label class="filter-title"><i class="fas fa-cogs"></i> Filter Unit Type</label>
+                <div class="filter-dropdown" id="unitTypeFilterDropdown">
+                    <button type="button" class="filter-toggle-btn" id="unitTypeFilterToggle" onclick="toggleUnitTypeFilterDropdown()">
+                        <span id="unitTypeFilterSummary">All units</span>
                         <i class="fas fa-chevron-down"></i>
                     </button>
-                    <div class="filter-dropdown-menu" id="categoryFilterMenu">
+                    <div class="filter-dropdown-menu" id="unitTypeFilterMenu">
                         <div class="filter-dropdown-actions">
-                            <span style="font-size: 11px; color: #8fa2b8;">Select one or more filters</span>
+                            <span style="font-size: 11px; color: #8fa2b8;">Select one or more unit types</span>
                             <div style="display: flex; gap: 6px;">
-                                <button type="button" class="filter-action-btn" onclick="selectAllCategoryFilters()">Select All</button>
-                                <button type="button" class="filter-action-btn" onclick="clearCategoryFilters()">Clear</button>
+                                <button type="button" class="filter-action-btn" onclick="selectAllUnitTypeFilters()">Select All</button>
+                                <button type="button" class="filter-action-btn" onclick="clearUnitTypeFilters()">Clear</button>
                             </div>
                         </div>
-                        <div class="filter-dropdown-options" id="colorPickerContainer">
+                        <div class="filter-dropdown-options" id="unitTypePickerContainer">
                             <!-- Filter options are inserted by JS -->
                         </div>
                     </div>
@@ -1680,11 +1767,12 @@ if (empty($allItems)) {
                         <th>Invoice No.</th>
                         <th>Date</th>
                         <th id="itemHeader">Item</th>
+                        <th>Unit Type</th>
                         <th>Description</th>
                         <th>Qty.</th>
                         <th>UOM</th>
                         <th>Serial No.</th>
-                        <th id="soldToHeader">Sold To</th>
+                        <th>Sold To</th>
                         <th>Date Delivered</th>
                         <th>Remarks</th>
                         <th>Action</th>
@@ -1693,33 +1781,60 @@ if (empty($allItems)) {
                 <tbody>
                     <?php if (empty($delivery_records)): ?>
                     <tr>
-                        <td colspan="12" style="text-align: center; padding: 40px; color: #a0a0a0;">
+                        <td colspan="13" style="text-align: center; padding: 40px; color: #a0a0a0;">
                             <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 15px; display: block;"></i>
                             No delivery records found. <a href="upload-data.php" style="color: #f4d03f;">Upload data</a> to get started.
                         </td>
                     </tr>
                     <?php else: ?>
-                    <?php $row_index = 0; foreach ($delivery_records as $record): 
+                    <?php 
+                    // Group records by invoice_no to identify multi-item invoices
+                    $invoice_groups = [];
+                    foreach ($delivery_records as $record) {
+                        $inv_no = (string)($record['invoice_no'] ?? '');
+                        if (!isset($invoice_groups[$inv_no])) {
+                            $invoice_groups[$inv_no] = [];
+                        }
+                        $invoice_groups[$inv_no][] = $record;
+                    }
+                    
+                    $row_index = 0;
+                    $group_index = 0;
+                    foreach ($invoice_groups as $invoice_no => $items):
+                        $is_multi_item = count($items) > 1;
+                        $group_id = 'invoice-group-' . md5($invoice_no . '-' . $group_index);
+                        
+                        // Render group header if multiple items
+                        if ($is_multi_item): 
+                            $hidden_class = ($row_index >= 30) ? 'hidden-row' : '';
+                    ?>
+                    <tr class="invoice-group-header <?php echo $hidden_class; ?>" data-group-id="<?php echo htmlspecialchars($group_id); ?>" onclick="toggleInvoiceGroup('<?php echo htmlspecialchars($group_id); ?>')">
+                        <td colspan="13" style="padding: 12px; background: linear-gradient(135deg, #1abc9c, #16a085); color: #ffffff; cursor: pointer; font-weight: 600; border-left: 4px solid #0f8b7b;">
+                            <i class="fas fa-chevron-down group-toggle-icon" style="margin-right: 8px; transition: transform 0.3s; display: inline-block;"></i>
+                            <span style="font-size: 14px;">📦 Invoice: <strong><?php echo htmlspecialchars($invoice_no); ?></strong> - <span class="item-count"><?php echo count($items); ?></span> items</span>
+                        </td>
+                    </tr>
+                    <?php 
+                        $row_index++;
+                        endif;
+                        
+                        // Render each item in the group
+                        foreach ($items as $record): 
                         $delivery_date = '';
-                        if (!empty($record['delivery_date']) && $record['delivery_date'] !== '0000-00-00') {
-                            $timestamp = strtotime($record['delivery_date']);
-                            if ($timestamp !== false && date('Y', $timestamp) > 1900) {
-                                $delivery_date = date('M j, Y', $timestamp);
-                            }
+                        if (!empty($record['delivery_date'])) {
+                            $delivery_date = date('M j, Y', strtotime($record['delivery_date']));
                         }
                         
                         // Get sold_to fields - only show if they have actual values
                         $sold_to_month = !empty($record['sold_to_month']) ? $record['sold_to_month'] : '';
                         $sold_to_day = !empty($record['sold_to_day']) ? $record['sold_to_day'] : '';
                         
-                        // Format the Date column from Excel uploaded data (record_date)
+                        // Format the Date column from delivery_date
                         $date_col = '';
-                        if (!empty($record['record_date']) && $record['record_date'] !== '0000-00-00') {
-                            $timestamp = strtotime($record['record_date']);
-                            // Only format if strtotime succeeded and year is valid (> 1900)
-                            if ($timestamp !== false && date('Y', $timestamp) > 1900) {
-                                $date_col = date('m/d/Y', $timestamp);
-                            }
+                        if (!empty($record['record_date'])) {
+                            $date_col = date('m/d/Y', strtotime($record['record_date']));
+                        } elseif (!empty($record['delivery_date'])) {
+                            $date_col = date('m/d/Y', strtotime($record['delivery_date']));
                         }
 
                         $created_at = !empty($record['created_at']) ? strtotime($record['created_at']) : 0;
@@ -1872,11 +1987,12 @@ if (empty($allItems)) {
                             return ' style="' . implode('; ', $styles) . ';"';
                         };
                     ?>
-                    <tr data-record-id="<?php echo htmlspecialchars($record['id'] ?? ''); ?>" data-row-index="<?php echo $row_index; ?>" data-dataset="<?php echo htmlspecialchars($record['dataset_name'] ?? '', ENT_QUOTES); ?>" data-sold-to="<?php echo htmlspecialchars($display_sold_to, ENT_QUOTES); ?>" data-company-name="<?php echo htmlspecialchars((string) ($record['company_name'] ?? ''), ENT_QUOTES); ?>" data-created-at="<?php echo htmlspecialchars((string) ($record['created_at'] ?? '')); ?>" data-status="<?php echo htmlspecialchars($statusText); ?>" data-category="<?php echo htmlspecialchars(strtolower(trim((string) ($record['groupings'] ?? '')))); ?>" data-item-code="<?php echo htmlspecialchars((string) ($record['item_code'] ?? ''), ENT_QUOTES); ?>" data-item-name="<?php echo htmlspecialchars((string) ($record['item_name'] ?? ''), ENT_QUOTES); ?>" data-invoice-no="<?php echo htmlspecialchars((string) ($record['invoice_no'] ?? ''), ENT_QUOTES); ?>" data-serial-no="<?php echo htmlspecialchars((string) ($record['serial_no'] ?? ''), ENT_QUOTES); ?>" data-quantity="<?php echo htmlspecialchars((string) ($record['quantity'] ?? ''), ENT_QUOTES); ?>" data-uom="<?php echo htmlspecialchars((string) ($record['uom'] ?? ''), ENT_QUOTES); ?>" data-notes="<?php echo htmlspecialchars((string) ($record['notes'] ?? ''), ENT_QUOTES); ?>" data-highlight-color="<?php echo htmlspecialchars($highlightColor, ENT_QUOTES); ?>" data-cell-styles="<?php echo htmlspecialchars((string) ($record['cell_styles'] ?? ''), ENT_QUOTES); ?>" class="<?php echo trim($hidden_class . ' ' . $andison_class . ' ' . $highlightClass . ' ' . ($is_new_record ? 'new-record' : '')); ?>"<?php echo $highlightStyle; ?>>
+                    <tr data-record-id="<?php echo htmlspecialchars($record['id'] ?? ''); ?>" data-row-index="<?php echo $row_index; ?>" data-group-id="<?php echo htmlspecialchars($group_id); ?>" data-dataset="<?php echo htmlspecialchars($record['dataset_name'] ?? '', ENT_QUOTES); ?>" data-sold-to="<?php echo htmlspecialchars($display_sold_to, ENT_QUOTES); ?>" data-company-name="<?php echo htmlspecialchars((string) ($record['company_name'] ?? ''), ENT_QUOTES); ?>" data-created-at="<?php echo htmlspecialchars((string) ($record['created_at'] ?? '')); ?>" data-status="<?php echo htmlspecialchars($statusText); ?>" data-category="<?php echo htmlspecialchars(strtolower(trim((string) ($record['groupings'] ?? '')))); ?>" data-item-code="<?php echo htmlspecialchars((string) ($record['item_code'] ?? ''), ENT_QUOTES); ?>" data-item-name="<?php echo htmlspecialchars((string) ($record['item_name'] ?? ''), ENT_QUOTES); ?>" data-invoice-no="<?php echo htmlspecialchars((string) ($record['invoice_no'] ?? ''), ENT_QUOTES); ?>" data-serial-no="<?php echo htmlspecialchars((string) ($record['serial_no'] ?? ''), ENT_QUOTES); ?>" data-quantity="<?php echo htmlspecialchars((string) ($record['quantity'] ?? ''), ENT_QUOTES); ?>" data-uom="<?php echo htmlspecialchars((string) ($record['uom'] ?? ''), ENT_QUOTES); ?>" data-notes="<?php echo htmlspecialchars((string) ($record['notes'] ?? ''), ENT_QUOTES); ?>" data-unit-type="<?php echo htmlspecialchars(strtolower((string) ($record['unit_type'] ?? '')), ENT_QUOTES); ?>" data-highlight-color="<?php echo htmlspecialchars($highlightColor, ENT_QUOTES); ?>" data-cell-styles="<?php echo htmlspecialchars((string) ($record['cell_styles'] ?? ''), ENT_QUOTES); ?>" class="invoice-group-item <?php echo trim($hidden_class . ' ' . $andison_class . ' ' . $highlightClass . ' ' . ($is_new_record ? 'new-record' : '')); ?>"<?php echo $highlightStyle; ?>>
                         <td<?php echo $cellStyleAttr('groupings'); ?>><?php echo htmlspecialchars($record['groupings'] ?? ''); ?></td>
                         <td<?php echo $cellStyleAttr('invoice_no'); ?>><?php echo htmlspecialchars($record['invoice_no'] ?? ''); ?><?php if ($is_new_record): ?><span class="new-pill">NEW</span><?php endif; ?></td>
                         <td<?php echo $cellStyleAttr('record_date'); ?>><?php echo htmlspecialchars($date_col); ?></td>
                         <td<?php echo $cellStyleAttr('item_code'); ?>><?php echo htmlspecialchars($record['item_code'] ?? ''); ?></td>
+                        <td<?php echo $cellStyleAttr('unit_type'); ?>><?php echo htmlspecialchars(strtoupper($record['unit_type'] ?? '')); ?></td>
                         <td<?php echo $cellStyleAttr('item_name'); ?>><?php echo htmlspecialchars($record['item_name'] ?? ''); ?></td>
                         <td<?php echo $cellStyleAttr('quantity'); ?>><?php echo (!empty($record['quantity']) && $record['quantity'] > 0) ? htmlspecialchars($record['quantity']) : ''; ?></td>
                         <td<?php echo $cellStyleAttr('uom'); ?>><?php echo htmlspecialchars($record['uom'] ?? ''); ?></td>
@@ -1887,16 +2003,17 @@ if (empty($allItems)) {
                         <td class="action-cell">
                             <div class="action-buttons">
                                 <a href="#" class="view-btn" onclick="openModal(event, <?php echo (int)($record['id'] ?? 0); ?>)"><i class="fas fa-eye"></i> View</a>
-                                <?php if ($canEditDelivery): ?>
+                                <?php if (isPermissionEnabled('delivery_edit_records', $conn)): ?>
                                 <a href="#" class="edit-btn" onclick="openEditModal(event, <?php echo (int)($record['id'] ?? 0); ?>)"><i class="fas fa-edit"></i> Edit</a>
                                 <?php endif; ?>
-                                <?php if ($canDeleteDelivery): ?>
+                                <?php if (isPermissionEnabled('delivery_delete_records', $conn)): ?>
                                 <a href="#" class="delete-btn" onclick="deleteRecord(event, <?php echo (int)($record['id'] ?? 0); ?>, '<?php echo htmlspecialchars((string)($record['item_code'] ?? ''), ENT_QUOTES); ?>')"><i class="fas fa-trash"></i> Delete</a>
                                 <?php endif; ?>
                             </div>
                         </td>
                     </tr>
                     <?php $row_index++; endforeach; ?>
+                    <?php $group_index++; endforeach; ?>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -1974,6 +2091,19 @@ if (empty($allItems)) {
                             <?php endforeach; ?>
                         </select>
                         <small class="input-hint">Select from existing product codes</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="add_unit_type">Unit Type</label>
+                        <select id="add_unit_type" name="unit_type">
+                            <option value="">-- Select Unit Type --</option>
+                            <option value="1A">1A</option>
+                            <option value="1B">1B</option>
+                            <option value="2A">2A</option>
+                            <option value="2B">2B</option>
+                            <option value="3A">3A</option>
+                            <option value="4A">4A</option>
+                        </select>
+                        <small class="input-hint">Unit classification (1A, 1B, 2A, 2B, 3A, 4A)</small>
                     </div>
                     <div class="form-group full-width">
                         <label for="add_item_name">Description</label>
@@ -2118,7 +2248,11 @@ if (empty($allItems)) {
                     <span class="modal-value" id="modalItem">-</span>
                 </div>
                 <div class="modal-row">
-                    <span class="modal-label">Description</span>
+                    <span class="modal-label">Unit Type</span>
+                    <span class="modal-value" id="modalUnitType">-</span>
+                </div>
+                <div class="modal-row">
+                    <span class="modal-label"></span>Description</span>
                     <span class="modal-value" id="modalDescription">-</span>
                 </div>
                 <div class="modal-row">
@@ -2246,6 +2380,19 @@ if (empty($allItems)) {
                         </select>
                         <small class="input-hint">Select from existing product codes</small>
                     </div>
+                    <div class="form-group">
+                        <label for="edit_unit_type">Unit Type</label>
+                        <select id="edit_unit_type" name="unit_type">
+                            <option value="">-- Select Unit Type --</option>
+                            <option value="1A">1A</option>
+                            <option value="1B">1B</option>
+                            <option value="2A">2A</option>
+                            <option value="2B">2B</option>
+                            <option value="3A">3A</option>
+                            <option value="4A">4A</option>
+                        </select>
+                        <small class="input-hint">Unit classification (1A, 1B, 2A, 2B, 3A, 4A)</small>
+                    </div>
                     <div class="form-group full-width">
                         <label for="edit_item_name">Description</label>
                         <input type="text" id="edit_item_name" name="item_name" placeholder="e.g., GasAlertMax XT O2/LEL/H2S/CO">
@@ -2359,6 +2506,25 @@ if (empty($allItems)) {
     <script src="js/app.js" defer></script>
     <script src="js/xlsx.min.js"></script>
     <script>
+        // Invoice Group Collapse/Expand Toggle
+        function toggleInvoiceGroup(groupId) {
+            const items = document.querySelectorAll(`tr[data-group-id="${groupId}"].invoice-group-item`);
+            const header = document.querySelector(`tr[data-group-id="${groupId}"].invoice-group-header`);
+            const icon = header ? header.querySelector('.group-toggle-icon') : null;
+            
+            if (!items.length) return;
+            
+            const isHidden = items[0].style.display === 'none';
+            
+            items.forEach(item => {
+                item.style.display = isHidden ? '' : 'none';
+            });
+            
+            if (icon) {
+                icon.style.transform = isHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+            }
+        }
+        
         // Loader Functions
         let recordsLoaderDotsInterval = null;
         let recordsLoaderStartTime = null;
@@ -2641,6 +2807,7 @@ if (empty($allItems)) {
             document.getElementById('modalDeliveryDay').textContent = record.delivery_day || '';
             document.getElementById('modalYear').textContent = record.delivery_year || '';
             document.getElementById('modalItem').textContent = record.item_code || '';
+            document.getElementById('modalUnitType').textContent = record.unit_type ? record.unit_type.toUpperCase() : '';
             document.getElementById('modalDescription').textContent = record.item_name || '';
             document.getElementById('modalQty').textContent = record.quantity || '';
             document.getElementById('modalUnitPrice').textContent = record.unit_price ? parseFloat(record.unit_price).toFixed(2) : '-';
@@ -2820,6 +2987,7 @@ if (empty($allItems)) {
                 delivery_day: parseInt(document.getElementById('add_delivery_day').value) || 0,
                 year: parseInt(document.getElementById('add_year').value) || 0,
                 item_code: document.getElementById('add_item_code').value,
+                unit_type: document.getElementById('add_unit_type').value,
                 item_name: document.getElementById('add_item_name').value,
                 quantity: parseInt(document.getElementById('add_quantity').value) || 0,
                 unit_price: parseFloat(document.getElementById('add_unit_price').value) || 0,
@@ -2932,6 +3100,7 @@ if (empty($allItems)) {
                             <td>${newRecord.invoice_no || ''}<span class="new-pill">NEW</span></td>
                             <td>${date_col}</td>
                             <td>${newRecord.item_code || ''}</td>
+                            <td>${String(newRecord.unit_type || '').toUpperCase()}</td>
                             <td>${newRecord.item_name || ''}</td>
                             <td style="text-align:center;">${newRecord.quantity || ''}</td>
                             <td>${newRecord.uom || ''}</td>
@@ -3025,6 +3194,7 @@ if (empty($allItems)) {
             document.getElementById('edit_invoice_no').value = record.invoice_no || '';
             document.getElementById('edit_serial_no').value = record.serial_no || '';
             document.getElementById('edit_item_code').value = record.item_code || '';
+            document.getElementById('edit_unit_type').value = record.unit_type || '';
             document.getElementById('edit_item_name').value = record.item_name || '';
             document.getElementById('edit_company_name').value = record.company_name || '';
             document.getElementById('edit_quantity').value = record.quantity || '';
@@ -3096,6 +3266,7 @@ if (empty($allItems)) {
                 serial_no: document.getElementById('edit_serial_no').value,
                 invoice_no: document.getElementById('edit_invoice_no').value,
                 item_code: document.getElementById('edit_item_code').value,
+                unit_type: document.getElementById('edit_unit_type').value,
                 item_name: document.getElementById('edit_item_name').value,
                 company_name: document.getElementById('edit_company_name').value,
                 quantity: parseInt(document.getElementById('edit_quantity').value) || 0,
@@ -3164,6 +3335,7 @@ if (empty($allItems)) {
             value = value.replace(/[()]/g, ' ');
             value = value.replace(/\s+/g, ' ').trim();
 
+            // Match with full descriptions first
             if (value.includes('1a') && (value.includes('bw knit') || value.includes('serial no') || value.includes('serial'))) return '1a_bw_knit_serial';
             if (value.includes('1b') && value.includes('accessories')) return '1b_accessories';
             if (value.includes('2a') && (value.includes('rae unit') || value.includes('serial no') || value.includes('serial'))) return '2a_rae_unit_serial';
@@ -3171,6 +3343,14 @@ if (empty($allItems)) {
             if (value.includes('3a') && value.includes('warranty replacement')) return '3a_warranty_replacement';
             if (value.includes('4a') && value.includes('calibration gas')) return '4a_calibration_gas_regulator';
             if (value.includes('no sales record') && value.includes('1a')) return 'no_sales_record_1a';
+
+            // Fallback: match simple unit type codes (1a, 1b, 2a, 2b, 3a, 4a)
+            if (value === '1a' || value === '1a - bw knit w/ serial no.') return '1a_bw_knit_serial';
+            if (value === '1b') return '1b_accessories';
+            if (value === '2a' || value === '2a - rae unit w/ serial no') return '2a_rae_unit_serial';
+            if (value === '2b') return '2b_rae_accessories';
+            if (value === '3a') return '3a_warranty_replacement';
+            if (value === '4a') return '4a_calibration_gas_regulator';
 
             if (value.includes('katay')) return 'katay';
             if (value.includes('send to andison') || value.includes('send to andiso')) return 'send_to_andison';
@@ -3409,25 +3589,25 @@ if (empty($allItems)) {
                     return rowTypeLabel === (labelMap[filterValue] || '');
 
                 case '1a_bw_knit_serial':
-                    return (rowCategory === '1a_bw_knit_serial' || rowCategoryRaw === '1a') && rowHasSerialNumber(row);
+                    return rowCategory === '1a_bw_knit_serial' || rowCategoryRaw.includes('1a');
 
                 case '1b_accessories':
-                    return rowCategory === '1b_accessories' || rowCategoryRaw === '1b';
+                    return rowCategory === '1b_accessories' || rowCategoryRaw.includes('1b');
 
                 case '2a_rae_unit_serial':
-                    return (rowCategory === '2a_rae_unit_serial' || rowCategoryRaw === '2a') && rowHasSerialNumber(row);
+                    return rowCategory === '2a_rae_unit_serial' || rowCategoryRaw.includes('2a');
 
                 case '2b_rae_accessories':
-                    return rowCategory === '2b_rae_accessories' || rowCategoryRaw === '2b';
+                    return rowCategory === '2b_rae_accessories' || rowCategoryRaw.includes('2b');
 
                 case '3a_warranty_replacement':
-                    return rowCategory === '3a_warranty_replacement' || rowCategoryRaw === '3a';
+                    return rowCategory === '3a_warranty_replacement' || rowCategoryRaw.includes('3a');
 
                 case '4a_calibration_gas_regulator':
-                    return rowCategory === '4a_calibration_gas_regulator' || rowCategoryRaw === '4a';
+                    return rowCategory === '4a_calibration_gas_regulator' || rowCategoryRaw.includes('4a');
 
                 case 'no_sales_record_1a':
-                    return (rowCategory === 'no_sales_record_1a' || rowCategoryRaw === '1a') && rowHasNoSalesRecord(row);
+                    return (rowCategory === 'no_sales_record_1a' || rowCategoryRaw.includes('1a')) && rowHasNoSalesRecord(row);
 
                 default:
                     return false;
@@ -3596,8 +3776,8 @@ if (empty($allItems)) {
             const searchInput = document.getElementById('searchInput');
             const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
 
-            const showAll = selectedCategoryFilters.length === 0
-                || selectedCategoryFilters.length === availableCategoryFilters.length;
+            const showAllUnitType = selectedUnitTypes.length === 0
+                || selectedUnitTypes.length === availableUnitTypes.length;
             const hasSearch = query !== '';
 
             // Show/hide rows based on filter
@@ -3605,25 +3785,27 @@ if (empty($allItems)) {
                 // Skip rows with colspan (empty state)
                 if (row.querySelector('td[colspan]')) return;
 
-                let categoryMatched = false;
-                if (showAll) {
-                    categoryMatched = true;
+                // Check unit type filter
+                let unitTypeMatched = false;
+                if (showAllUnitType) {
+                    unitTypeMatched = true;
                 } else {
-                    categoryMatched = selectedCategoryFilters.some(filterValue => rowMatchesColorFilter(row, filterValue));
+                    const rowUnitType = (row.getAttribute('data-unit-type') || '').trim().toLowerCase();
+                    unitTypeMatched = selectedUnitTypes.some(ut => ut.toLowerCase() === rowUnitType);
                 }
 
                 const rowText = row.textContent.toLowerCase();
                 const searchMatched = !hasSearch || rowText.includes(query);
-                const matched = categoryMatched && searchMatched;
+                const matched = unitTypeMatched && searchMatched;
 
-                if (showAll && !hasSearch) {
+                if (showAllUnitType && !hasSearch) {
                     const rowIndex = parseInt(row.getAttribute('data-row-index') || '0', 10);
                     const shouldShowByPage = rowIndex < currentVisibleRows;
                     row.classList.remove('filtered-match');
                     row.classList.toggle('hidden-row', !shouldShowByPage);
                     row.style.display = shouldShowByPage ? 'table-row' : 'none';
                 } else {
-                    // While searching/filtering by category, ignore pagination and show exact matches only.
+                    // While searching/filtering by unit type, ignore pagination and show exact matches only.
                     row.classList.remove('hidden-row');
                     if (matched) {
                         row.classList.add('filtered-match');
@@ -3637,7 +3819,7 @@ if (empty($allItems)) {
 
             // Hide pagination controls while filtering
             if (loadMoreContainer) {
-                if (showAll && !hasSearch) {
+                if (showAllUnitType && !hasSearch) {
                     loadMoreContainer.style.display = 'flex';
                     updateVisibleCount();
                     updateLoadMoreState();
@@ -3657,8 +3839,8 @@ if (empty($allItems)) {
             }
         });
 
-        // Initialize color picker immediately
-        (function() {
+        // Initialize color picker immediately (REMOVED - Groupings filter disabled)
+        /*(function() {
             initializeColorPicker();
             updateCategoryOptionStyles();
             updateCategoryFilterSummary();
@@ -3671,7 +3853,177 @@ if (empty($allItems)) {
                     initializeColorPicker();
                 }
             }, 100);
+        });*/
+
+        // Unit Type Filter System
+        let availableUnitTypes = <?php echo json_encode($allUnitTypes); ?>;
+        let selectedUnitTypes = [];
+
+        function initializeUnitTypeFilter() {
+            if (availableUnitTypes.length === 0) {
+                const container = document.getElementById('unitTypeFilters');
+                if (container) container.style.display = 'none';
+                return;
+            }
+
+            selectedUnitTypes = Array.from(availableUnitTypes);
+
+            const container = document.getElementById('unitTypePickerContainer');
+            if (!container) return;
+
+            // Generate filter HTML
+            let html = `
+                <button type="button" class="filter-option active" data-filter-value="all" onclick="toggleUnitTypeFilter('all')">
+                    <span style="display: inline-block; width: 20px; height: 20px; border-radius: 4px; background: white; border: 2px solid #51cf66; margin-right: 10px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-check" style="color: #51cf66; font-size: 12px;"></i></span>
+                    <span>All Units</span>
+                </button>
+            `;
+
+            availableUnitTypes.forEach(unitType => {
+                const displayName = unitType.toUpperCase();
+                
+                // Add descriptions for each unit type
+                const descriptions = {
+                    '1a': 'BW Unit',
+                    '1b': 'Accessories',
+                    '2a': 'RAE Unit',
+                    '3a': 'Warranty Replacement',
+                    '4a': 'Calibration Gas and Regulator'
+                };
+                
+                const description = descriptions[unitType] || '';
+                
+                html += `
+                    <button type="button" class="filter-option active" data-filter-value="${unitType}" onclick="toggleUnitTypeFilter('${unitType}')">
+                        <span style="display: inline-block; width: 20px; height: 20px; border-radius: 4px; background: #06b6d4; margin-right: 10px;"></span>
+                        <div style="flex: 1; text-align: left;">
+                            <span style="font-weight: 600; display: block;">${displayName}</span>
+                            <span style="font-size: 12px; color: #8fa2b8; display: block;">${description}</span>
+                        </div>
+                    </button>
+                `;
+            });
+
+            container.innerHTML = html;
+            updateUnitTypeFilterSummary();
+            applyCategoryFilters();
+        }
+
+        function toggleUnitTypeFilterDropdown() {
+            const menu = document.getElementById('unitTypeFilterMenu');
+            const toggle = document.getElementById('unitTypeFilterToggle');
+            if (!menu || !toggle) return;
+
+            const willShow = !menu.classList.contains('show');
+            menu.classList.toggle('show', willShow);
+            toggle.classList.toggle('open', willShow);
+        }
+
+        function closeUnitTypeFilterDropdown() {
+            const menu = document.getElementById('unitTypeFilterMenu');
+            const toggle = document.getElementById('unitTypeFilterToggle');
+            if (!menu || !toggle) return;
+            menu.classList.remove('show');
+            toggle.classList.remove('open');
+        }
+
+        function updateUnitTypeFilterSummary() {
+            const summary = document.getElementById('unitTypeFilterSummary');
+            if (!summary) return;
+
+            if (selectedUnitTypes.length === 0 || selectedUnitTypes.length === availableUnitTypes.length) {
+                summary.textContent = 'All units';
+                return;
+            }
+
+            if (selectedUnitTypes.length === 1) {
+                summary.textContent = selectedUnitTypes[0].toUpperCase();
+                return;
+            }
+
+            summary.textContent = `${selectedUnitTypes.length} units selected`;
+        }
+
+        function updateUnitTypeOptionStyles() {
+            const isAll = selectedUnitTypes.length === 0
+                || selectedUnitTypes.length === availableUnitTypes.length;
+
+            document.querySelectorAll('#unitTypePickerContainer .filter-option').forEach(option => {
+                const value = option.getAttribute('data-filter-value');
+                if (value === 'all') {
+                    option.classList.toggle('active', isAll);
+                } else {
+                    option.classList.toggle('active', isAll || selectedUnitTypes.includes(value));
+                }
+            });
+        }
+
+        function toggleUnitTypeFilter(filterValue) {
+            if (filterValue === 'all') {
+                selectedUnitTypes = Array.from(availableUnitTypes);
+                updateUnitTypeOptionStyles();
+                updateUnitTypeFilterSummary();
+                applyCategoryFilters();
+                return;
+            }
+
+            if (selectedUnitTypes.length === availableUnitTypes.length) {
+                selectedUnitTypes = [filterValue];
+                updateUnitTypeOptionStyles();
+                updateUnitTypeFilterSummary();
+                applyCategoryFilters();
+                return;
+            }
+
+            const idx = selectedUnitTypes.indexOf(filterValue);
+            if (idx >= 0) {
+                selectedUnitTypes.splice(idx, 1);
+            } else {
+                selectedUnitTypes.push(filterValue);
+            }
+
+            if (selectedUnitTypes.length === 0) {
+                selectedUnitTypes = Array.from(availableUnitTypes);
+            }
+
+            updateUnitTypeOptionStyles();
+            updateUnitTypeFilterSummary();
+            applyCategoryFilters();
+        }
+
+        function selectAllUnitTypeFilters() {
+            selectedUnitTypes = Array.from(availableUnitTypes);
+            updateUnitTypeOptionStyles();
+            updateUnitTypeFilterSummary();
+            applyCategoryFilters();
+        }
+
+        function clearUnitTypeFilters() {
+            selectedUnitTypes = [];
+            updateUnitTypeOptionStyles();
+            updateUnitTypeFilterSummary();
+            applyCategoryFilters();
+        }
+
+        function applyUnitTypeFilters() {
+            // This function is replaced by applyCategoryFilters which now handles both filters
+            applyCategoryFilters();
+        }
+
+        document.addEventListener('click', function(event) {
+            const dropdown = document.getElementById('unitTypeFilterDropdown');
+            if (!dropdown) return;
+            if (!dropdown.contains(event.target)) {
+                closeUnitTypeFilterDropdown();
+            }
         });
+
+        // Initialize unit type filter immediately
+        (function() {
+            initializeUnitTypeFilter();
+            updateUnitTypeOptionStyles();
+            updateUnitTypeFilterSummary();
+        })();
 
         // Search functionality
         let searchActive = false;
@@ -3957,30 +4309,30 @@ if (empty($allItems)) {
     
     <!-- Dataset Management Modal -->
     <div id="datasetManageModal" onclick="if(event.target===this)closeDatasetModal()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:9999;">
-        <div style="background:linear-gradient(135deg,#1e2a38 0%,#2a3f5f 100%); border-radius:16px; padding:30px; max-width:420px; width:90%; border:1px solid rgba(255,255,255,0.1); box-shadow:0 20px 40px rgba(0,0,0,0.4);">
-            <h3 style="color:#f4d03f; margin:0 0 20px; font-size:18px; display:flex; align-items:center; gap:10px;">
+        <div style="background:linear-gradient(135deg,#ffffff 0%,#f8f9fa 100%); border-radius:16px; padding:30px; max-width:420px; width:90%; border:2px solid #2c5aa0; box-shadow:0 10px 30px rgba(0,0,0,0.1);">
+            <h3 style="color:#1e3a8a; margin:0 0 20px; font-size:18px; display:flex; align-items:center; gap:10px;">
                 <i class="fas fa-database"></i> Manage Dataset
             </h3>
-            <p style="color:#8a9ab5; margin-bottom:20px; font-size:13px;">
-                Current dataset: <strong id="currentDatasetName" style="color:#fff;"></strong>
+            <p style="color:#5a6a7a; margin-bottom:20px; font-size:13px;">
+                Current dataset: <strong id="currentDatasetName" style="color:#1a3a5c;"></strong>
             </p>
             
             <div style="margin-bottom:20px;">
-                <label style="color:#a0b0c0; font-size:12px; display:block; margin-bottom:8px;">
+                <label style="color:#2c5aa0; font-size:12px; display:block; margin-bottom:8px;">
                     <i class="fas fa-tag"></i> New Name:
                 </label>
                 <input type="text" id="newDatasetName" placeholder="Enter new dataset name..." 
-                    style="width:100%; padding:12px 15px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.3); color:#fff; font-size:14px; font-family:'Poppins',sans-serif; box-sizing:border-box;">
+                    style="width:100%; padding:12px 15px; border-radius:8px; border:2px solid #2c5aa0; background:#fff; color:#000; font-size:14px; font-family:'Poppins',sans-serif; box-sizing:border-box;">
             </div>
             
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button onclick="renameDataset()" style="flex:1; background:linear-gradient(135deg,#f4d03f 0%,#e2b800 100%); color:#1a1a2e; border:none; padding:12px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; font-family:'Poppins',sans-serif;">
+                <button onclick="renameDataset()" style="flex:1; background:linear-gradient(135deg,#2c5aa0 0%,#1e3a8a 100%); color:#fff; border:none; padding:12px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; font-family:'Poppins',sans-serif;">
                     <i class="fas fa-save"></i> Save Name
                 </button>
                 <button onclick="deleteDataset()" style="background:linear-gradient(135deg,#ff6b6b 0%,#ee5a24 100%); color:#fff; border:none; padding:12px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; font-family:'Poppins',sans-serif;">
                     <i class="fas fa-trash"></i> Delete
                 </button>
-                <button onclick="closeDatasetModal()" style="background:rgba(255,255,255,0.1); color:#a0a0a0; border:1px solid rgba(255,255,255,0.2); padding:12px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; font-family:'Poppins',sans-serif;">
+                <button onclick="closeDatasetModal()" style="background:#f0f4f8; color:#2c5aa0; border:1px solid #2c5aa0; padding:12px 20px; border-radius:8px; cursor:pointer; font-weight:600; font-size:13px; font-family:'Poppins',sans-serif;">
                     Cancel
                 </button>
             </div>

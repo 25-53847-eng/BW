@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 $result = $conn->query("SELECT id, item_code, company_name, sold_to, created_at FROM delivery_records WHERE item_code = 'BWC2-H' ORDER BY created_at DESC LIMIT 10");

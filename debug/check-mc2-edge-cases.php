@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 $item_code = 'MC2-FPCB1';

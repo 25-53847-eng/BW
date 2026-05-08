@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 // Check total records

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 $owner_user_id = intval($_SESSION['user_id'] ?? 0);

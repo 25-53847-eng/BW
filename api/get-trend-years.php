@@ -22,23 +22,15 @@ header('Content-Type: application/json');
 
 try {
     // Determine where clause based on user role
-    // Admin: filter by owner_user_id (their own deliveries)
-    // Employee: no owner_user_id filter (see all company data)
+    // Both admin and employee: see all data (no owner_user_id filter)
     // Both: filter by unit_type IN ('1a', '2a', '4a')
-    if ($user_role === 'employee' || $api_role === 'employee') {
-        $where_base = "WHERE delivery_date IS NOT NULL AND delivery_date != '' AND sold_to IS NOT NULL AND sold_to != '' AND unit_type IN ('1a', '2a', '4a')";
-    } else {
-        $where_base = "WHERE owner_user_id = ? AND delivery_date IS NOT NULL AND delivery_date != '' AND sold_to IS NOT NULL AND sold_to != '' AND unit_type IN ('1a', '2a', '4a')";
-    }
+    $where_base = "WHERE delivery_date IS NOT NULL AND delivery_date != '' AND sold_to IS NOT NULL AND sold_to != '' AND unit_type IN ('1a', '2a', '4a')";
     
     // If year is not specified or is 0, get available years from delivery_date
     if ($year === null) {
         // Return available years list
         $where = $where_base;
         $params = [];
-        if ($user_role !== 'employee' && $api_role !== 'employee') {
-            $params[] = $user_id;
-        }
         
         if (!empty($dataset)) {
             $where .= " AND dataset_name = ?";
@@ -96,17 +88,10 @@ try {
         $where = $where_base;
     } else {
         // Get data for specific year
-        if ($user_role === 'employee' || $api_role === 'employee') {
-            $where = "WHERE YEAR(delivery_date) = ? AND delivery_date IS NOT NULL AND delivery_date != '' AND sold_to IS NOT NULL AND sold_to != '' AND unit_type IN ('1a', '2a', '4a')";
-        } else {
-            $where = "WHERE owner_user_id = ? AND YEAR(delivery_date) = ? AND delivery_date IS NOT NULL AND delivery_date != '' AND sold_to IS NOT NULL AND sold_to != '' AND unit_type IN ('1a', '2a', '4a')";
-        }
+        $where = "WHERE YEAR(delivery_date) = ? AND delivery_date IS NOT NULL AND delivery_date != '' AND sold_to IS NOT NULL AND sold_to != '' AND unit_type IN ('1a', '2a', '4a')";
     }
     
     $params = [];
-    if ($user_role !== 'employee' && $api_role !== 'employee') {
-        $params[] = $user_id;
-    }
     if ($year !== 0) {
         $params[] = $year;
     }

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../db_config.php';
 
 $backup_file = __DIR__ . '/backups/backup_2026-03-23_06-47-42.sql';
@@ -42,11 +42,11 @@ while (($line = fgets($handle)) !== false) {
 fclose($handle);
 
 echo "Restoration complete!\n";
-echo "✓ Restored: $restored records\n";
-echo "⊘ Skipped (duplicates): $skipped records\n";
+echo "? Restored: $restored records\n";
+echo "? Skipped (duplicates): $skipped records\n";
 
 if (count($errors) > 0) {
-    echo "✗ Errors: " . count(array_unique($errors)) . "\n";
+    echo "? Errors: " . count(array_unique($errors)) . "\n";
     foreach (array_unique($errors) as $err) {
         echo "  - $err\n";
     }
@@ -55,7 +55,7 @@ if (count($errors) > 0) {
 // Verify
 $check = $conn->query("SELECT COUNT(*) as cnt, COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE company_name = 'Stock Addition'");
 if ($check && $row = $check->fetch_assoc()) {
-    echo "\n✓ Verification:\n";
+    echo "\n? Verification:\n";
     echo "  Stock Addition records: " . $row['cnt'] . "\n";
     echo "  Total quantity: " . $row['total'] . "\n";
 }

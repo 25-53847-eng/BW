@@ -43,14 +43,14 @@ try {
     
     // If item code changed, update all records with that code
     if ($original_item_code !== $item_code) {
-        $conn->query("UPDATE delivery_records SET item_code = '{$item_code_esc}' WHERE item_code = '{$original_item_code_esc}' AND company_name = 'Stock Addition' AND owner_user_id = {$owner_user_id}");
+        $conn->query("UPDATE delivery_records SET item_code = '{$item_code_esc}' WHERE item_code = '{$original_item_code_esc}' AND company_name = 'Stock Addition'");
     }
     
     // Update item_name for all matching items
-    $conn->query("UPDATE delivery_records SET item_name = '{$item_name_esc}' WHERE item_code = '{$item_code_esc}' AND company_name = 'Stock Addition' AND owner_user_id = {$owner_user_id}");
+    $conn->query("UPDATE delivery_records SET item_name = '{$item_name_esc}' WHERE item_code = '{$item_code_esc}' AND company_name = 'Stock Addition'");
     
     // Get current total quantity
-    $result = $conn->query("SELECT COALESCE(SUM(quantity), 0) as current_total FROM delivery_records WHERE item_code = '{$item_code_esc}' AND company_name = 'Stock Addition' AND owner_user_id = {$owner_user_id}");
+    $result = $conn->query("SELECT COALESCE(SUM(quantity), 0) as current_total FROM delivery_records WHERE item_code = '{$item_code_esc}' AND company_name = 'Stock Addition'");
     if (!$result) {
         throw new Exception('Query failed: ' . $conn->error);
     }
@@ -64,11 +64,11 @@ try {
     // If there's a difference, we need to add/remove quantity to balance it
     if ($difference !== 0) {
         // Find the most recent record for this item
-        $recent = $conn->query("SELECT id, quantity FROM delivery_records WHERE item_code = '{$item_code_esc}' AND company_name = 'Stock Addition' AND owner_user_id = {$owner_user_id} ORDER BY updated_at DESC LIMIT 1");
+        $recent = $conn->query("SELECT id, quantity FROM delivery_records WHERE item_code = '{$item_code_esc}' AND company_name = 'Stock Addition' ORDER BY updated_at DESC LIMIT 1");
         if ($recent && $row = $recent->fetch_assoc()) {
             // Update the most recent record's quantity
             $new_qty = intval($row['quantity']) + $difference;
-            $update_result = $conn->query("UPDATE delivery_records SET quantity = {$new_qty}, updated_at = CURRENT_TIMESTAMP WHERE id = " . intval($row['id']) . " AND owner_user_id = {$owner_user_id}");
+            $update_result = $conn->query("UPDATE delivery_records SET quantity = {$new_qty}, updated_at = CURRENT_TIMESTAMP WHERE id = " . intval($row['id']));
             if (!$update_result) {
                 throw new Exception('Update failed: ' . $conn->error);
             }

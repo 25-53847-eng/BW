@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 echo "=== ALL TABLES & THEIR COLLATIONS ===\n";
@@ -13,11 +13,11 @@ while($row = $tables->fetch_assoc()) {
     $collation = $row['TABLE_COLLATION'];
     
     if(strpos($collation, 'general') !== false) {
-        echo "  ❌ $name: $collation\n";
+        echo "  ? $name: $collation\n";
         $general_count++;
         $mixed[] = $name;
     } elseif(strpos($collation, 'unicode') !== false) {
-        echo "  ✓ $name: $collation\n";
+        echo "  ? $name: $collation\n";
         $unicode_count++;
     } elseif($collation == NULL || $collation == '') {
         echo "  - $name: (VIEW or NULL)\n";
@@ -31,7 +31,7 @@ echo "Unicode CI: $unicode_count\n";
 echo "General CI: $general_count\n";
 
 if(count($mixed) > 0) {
-    echo "\n⚠️ Tables still using utf8mb4_general_ci:\n";
+    echo "\n?? Tables still using utf8mb4_general_ci:\n";
     foreach($mixed as $tbl) {
         echo "  - $tbl\n";
     }

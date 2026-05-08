@@ -6,9 +6,9 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
-require_once '../api/permission-helper.php';
+require_once 'api/permission-helper.php';
 require_once 'dataset-indicator.php';
-require_once '../api/dataset-status-helper.php';
+require_once 'api/dataset-status-helper.php';
 
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
@@ -115,7 +115,7 @@ if ($searchItem) {
 }
 
 $owner_user_id = intval($_SESSION['user_id'] ?? 0);
-// Employees should see ALL inventory items, not just their own
+// All users (admin and employees) see all inventory items
 $owner_filter_sql = "";
 
 // Get all items with stock and delivery counts
@@ -137,6 +137,7 @@ $result = $conn->query("
         id,
         item_code,
         item_name,
+        serial_no,
         quantity as current_stock,
         updated_at as last_updated
     FROM delivery_records
@@ -162,6 +163,7 @@ if ($result) {
         $items[] = [
             'id' => $row['id'] ?? null,
             'code' => $row['item_code'],
+            'serial_no' => $row['serial_no'] ?? '',
             'name' => $itemName,
             'box' => '',
             'model' => '',
@@ -319,7 +321,7 @@ if ($poItemsQuery) {
             border: 2px solid rgba(244, 208, 63, 0.3);
             background: linear-gradient(145deg, rgba(30, 42, 56, 0.95), rgba(20, 30, 45, 0.98));
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             min-width: 250px;
             transition: all 0.3s ease;
@@ -376,9 +378,9 @@ if ($poItemsQuery) {
         }
 
         .stat-card {
-            background: linear-gradient(135deg, #1e2a38 0%, #2a3f5f 100%);
+            background: linear-gradient(145deg, #ffffff, #f8f9fa);
             border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid #c5ddf0;
             padding: 25px;
             text-align: center;
             transition: all 0.3s ease;
@@ -416,21 +418,21 @@ if ($poItemsQuery) {
         .stat-card .value {
             font-size: 32px;
             font-weight: 700;
-            color: #fff;
+            color: #1a3a5c;
             margin-bottom: 5px;
         }
 
         .stat-card .label {
             font-size: 13px;
-            color: #a0a0a0;
+            color: #5a6a7a;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .inventory-table-container {
-            background: linear-gradient(135deg, #1e2a38 0%, #2a3f5f 100%);
+            background: linear-gradient(145deg, #ffffff, #f8f9fa);
             border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid #c5ddf0;
             padding: 25px;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -785,7 +787,7 @@ if ($poItemsQuery) {
             top: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(20, 30, 45, 0.7) 100%);
+            background: rgba(0, 0, 0, 0.4);
             backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
             animation: fadeIn 0.3s ease;
@@ -824,15 +826,15 @@ if ($poItemsQuery) {
         }
 
         .modal-content {
-            background: linear-gradient(145deg, #253547 0%, #1a2638 50%, #1a2638 100%);
+            background: linear-gradient(145deg, #ffffff, #f5f7fa);
             margin: 50px auto;
             padding: 45px;
-            border: 2px solid #f4d03f;
+            border: 2px solid #2c5aa0;
             border-radius: 20px;
             width: 90%;
             max-width: 550px;
             animation: slideDown 0.3s ease;
-            box-shadow: 0 30px 100px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 40px rgba(244, 208, 63, 0.15);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
         }
 
         @keyframes slideDown {
@@ -904,11 +906,11 @@ if ($poItemsQuery) {
             align-items: center;
             margin-bottom: 28px;
             padding-bottom: 18px;
-            border-bottom: 2px solid #f4d03f;
+            border-bottom: 2px solid #2c5aa0;
         }
 
         .modal-header h2 {
-            color: #ffffff;
+            color: #1e3a8a;
             font-size: 26px;
             margin: 0;
             display: flex;
@@ -916,18 +918,18 @@ if ($poItemsQuery) {
             gap: 12px;
             font-weight: 800;
             letter-spacing: 0.5px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            text-shadow: none;
         }
 
         .modal-header h2 i {
-            color: #f4d03f;
+            color: #2c5aa0;
             font-size: 24px;
         }
 
         .close-btn {
             background: none;
             border: none;
-            color: #8a9ab5;
+            color: #2c5aa0;
             font-size: 32px;
             cursor: pointer;
             transition: all 0.3s;
@@ -940,7 +942,7 @@ if ($poItemsQuery) {
         }
 
         .close-btn:hover {
-            color: #f4d03f;
+            color: #1e3a8a;
             transform: scale(1.15) rotate(90deg);
         }
 
@@ -950,7 +952,7 @@ if ($poItemsQuery) {
 
         .form-group label {
             display: block;
-            color: #b8c5d6;
+            color: #1e3a8a;
             font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
@@ -963,10 +965,10 @@ if ($poItemsQuery) {
             width: 100%;
             padding: 14px 16px;
             border-radius: 10px;
-            border: 1px solid rgba(244, 208, 63, 0.25);
-            background: linear-gradient(135deg, rgba(30, 42, 56, 0.6) 0%, rgba(20, 30, 45, 0.8) 100%);
-            color: #ffffff;
-            font-family: 'Poppins', sans-serif;
+            border: 2px solid #2c5aa0;
+            background: linear-gradient(145deg, #ffffff, #f0f4f8);
+            color: #000;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             box-sizing: border-box;
             transition: all 0.3s ease;
@@ -974,15 +976,15 @@ if ($poItemsQuery) {
 
         .form-group input::placeholder,
         .form-group textarea::placeholder {
-            color: rgba(255, 255, 255, 0.35);
+            color: rgba(0, 0, 0, 0.4);
         }
 
         .form-group input:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #f4d03f;
-            background: linear-gradient(135deg, rgba(30, 42, 56, 0.8) 0%, rgba(20, 30, 45, 0.95) 100%);
-            box-shadow: 0 0 15px rgba(244, 208, 63, 0.3), inset 0 0 8px rgba(244, 208, 63, 0.05);
+            border-color: #1e3a8a;
+            background: #fff;
+            box-shadow: 0 0 15px rgba(44, 90, 160, 0.2);
         }
 
         .form-group textarea {
@@ -991,7 +993,7 @@ if ($poItemsQuery) {
         }
 
         .form-group small {
-            color: #8a9ab5 !important;
+            color: #5a6a7a !important;
             font-size: 12px !important;
         }
 
@@ -1009,7 +1011,7 @@ if ($poItemsQuery) {
             font-weight: 700;
             cursor: pointer;
             font-size: 15px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             letter-spacing: 0.5px;
         }
@@ -1520,7 +1522,7 @@ if ($poItemsQuery) {
             border: 1px solid rgba(255,255,255,0.15);
             background: rgba(255,255,255,0.05);
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             transition: all 0.2s ease;
         }
@@ -1539,7 +1541,7 @@ if ($poItemsQuery) {
         .form-group textarea { 
             min-height: 100px; 
             resize: vertical;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
         .form-actions { 
             margin-top: 20px;
@@ -1859,27 +1861,27 @@ if ($poItemsQuery) {
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; flex: 1;">
                             <a href="<?php echo '?filter=all' . ($searchItem ? '&search=' . urlencode($searchItem) : ''); ?>" 
                                class="filter-btn <?php echo $filterStock === 'all' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $filterStock === 'all' ? 'linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: <?php echo $filterStock === 'all' ? '#1a3a5c' : '#e8e8e8'; ?>; text-decoration: none; border: 1px solid <?php echo $filterStock === 'all' ? 'rgba(244,208,63,0.3)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'all' ? '0 8px 20px rgba(244,208,63,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(244,208,63,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'all' ? '0 8px 20px rgba(244,208,63,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $filterStock === 'all' ? 'linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: <?php echo $filterStock === 'all' ? '#1a3a5c' : '#e8e8e8'; ?>; text-decoration: none; border: 1px solid <?php echo $filterStock === 'all' ? 'rgba(244,208,63,0.3)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'all' ? '0 8px 20px rgba(244,208,63,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(244,208,63,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'all' ? '0 8px 20px rgba(244,208,63,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'"
                                 All Items
                             </a>
                             <a href="<?php echo '?filter=critical' . ($searchItem ? '&search=' . urlencode($searchItem) : ''); ?>" 
                                class="filter-btn <?php echo $filterStock === 'critical' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $filterStock === 'critical' ? '#ff6b6b' : 'rgba(255,107,107,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'critical' ? 'rgba(255,107,107,0.4)' : 'rgba(255,107,107,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'critical' ? '0 8px 20px rgba(255,107,107,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(255,107,107,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'critical' ? '0 8px 20px rgba(255,107,107,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $filterStock === 'critical' ? '#ff6b6b' : 'rgba(255,107,107,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'critical' ? 'rgba(255,107,107,0.4)' : 'rgba(255,107,107,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'critical' ? '0 8px 20px rgba(255,107,107,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(255,107,107,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'critical' ? '0 8px 20px rgba(255,107,107,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
                                 <i class="fas fa-circle-xmark" style="margin-right: 5px;"></i> Critical
                             </a>
                             <a href="<?php echo '?filter=low' . ($searchItem ? '&search=' . urlencode($searchItem) : ''); ?>" 
                                class="filter-btn <?php echo $filterStock === 'low' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $filterStock === 'low' ? '#ffa500' : 'rgba(255,165,0,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'low' ? 'rgba(255,165,0,0.4)' : 'rgba(255,165,0,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'low' ? '0 8px 20px rgba(255,165,0,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(255,165,0,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'low' ? '0 8px 20px rgba(255,165,0,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $filterStock === 'low' ? '#ffa500' : 'rgba(255,165,0,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'low' ? 'rgba(255,165,0,0.4)' : 'rgba(255,165,0,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'low' ? '0 8px 20px rgba(255,165,0,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(255,165,0,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'low' ? '0 8px 20px rgba(255,165,0,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'"
                                 <i class="fas fa-exclamation-triangle" style="margin-right: 5px;"></i> Low
                             </a>
                             <a href="<?php echo '?filter=adequate' . ($searchItem ? '&search=' . urlencode($searchItem) : ''); ?>" 
                                class="filter-btn <?php echo $filterStock === 'adequate' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $filterStock === 'adequate' ? '#4a90e2' : 'rgba(74,144,226,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'adequate' ? 'rgba(74,144,226,0.4)' : 'rgba(74,144,226,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'adequate' ? '0 8px 20px rgba(74,144,226,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(74,144,226,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'adequate' ? '0 8px 20px rgba(74,144,226,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $filterStock === 'adequate' ? '#4a90e2' : 'rgba(74,144,226,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'adequate' ? 'rgba(74,144,226,0.4)' : 'rgba(74,144,226,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'adequate' ? '0 8px 20px rgba(74,144,226,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(74,144,226,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'adequate' ? '0 8px 20px rgba(74,144,226,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
                                 <i class="fas fa-check-circle" style="margin-right: 5px;"></i> Adequate
                             </a>
                             <a href="<?php echo '?filter=high' . ($searchItem ? '&search=' . urlencode($searchItem) : ''); ?>" 
                                class="filter-btn <?php echo $filterStock === 'high' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $filterStock === 'high' ? '#2ecc71' : 'rgba(46,204,113,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'high' ? 'rgba(46,204,113,0.4)' : 'rgba(46,204,113,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'high' ? '0 8px 20px rgba(46,204,113,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(46,204,113,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'high' ? '0 8px 20px rgba(46,204,113,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $filterStock === 'high' ? '#2ecc71' : 'rgba(46,204,113,0.1)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $filterStock === 'high' ? 'rgba(46,204,113,0.4)' : 'rgba(46,204,113,0.2)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $filterStock === 'high' ? '0 8px 20px rgba(46,204,113,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(46,204,113,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $filterStock === 'high' ? '0 8px 20px rgba(46,204,113,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'"
                                 <i class="fas fa-arrow-up" style="margin-right: 5px;"></i> High
                             </a>
                         </div>
@@ -1895,22 +1897,22 @@ if ($poItemsQuery) {
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; flex: 1;">
                             <a href="<?php echo '?sort=newest' . ($searchItem ? '&search=' . urlencode($searchItem) : '') . ($filterStock !== 'all' ? '&filter=' . $filterStock : ''); ?>" 
                                class="filter-btn <?php echo $sortBy === 'newest' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $sortBy === 'newest' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'newest' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'newest' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'newest' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $sortBy === 'newest' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'newest' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'newest' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'newest' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'"
                                 <i class="fas fa-clock" style="margin-right: 5px;"></i> Newest
                             </a>
                             <a href="<?php echo '?sort=name' . ($searchItem ? '&search=' . urlencode($searchItem) : '') . ($filterStock !== 'all' ? '&filter=' . $filterStock : ''); ?>" 
                                class="filter-btn <?php echo $sortBy === 'name' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $sortBy === 'name' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'name' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'name' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'name' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $sortBy === 'name' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'name' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'name' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'name' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'"
                                 <i class="fas fa-font" style="margin-right: 5px;"></i> A-Z
                             </a>
                             <a href="<?php echo '?sort=code' . ($searchItem ? '&search=' . urlencode($searchItem) : '') . ($filterStock !== 'all' ? '&filter=' . $filterStock : ''); ?>" 
                                class="filter-btn <?php echo $sortBy === 'code' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $sortBy === 'code' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'code' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'code' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'code' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $sortBy === 'code' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'code' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'code' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'code' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'"
                                 <i class="fas fa-barcode" style="margin-right: 5px;"></i> Box
                             </a>
                             <a href="<?php echo '?sort=stock' . ($searchItem ? '&search=' . urlencode($searchItem) : '') . ($filterStock !== 'all' ? '&filter=' . $filterStock : ''); ?>" 
                                class="filter-btn <?php echo $sortBy === 'stock' ? 'active' : ''; ?>" 
-                               style="padding: 8px 14px; border-radius: 7px; background: <?php echo $sortBy === 'stock' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'stock' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 11px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'stock' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'stock' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'">
+                               style="padding: 10px 18px; border-radius: 7px; background: <?php echo $sortBy === 'stock' ? 'linear-gradient(135deg, #17a2b8 0%, #138496 100%)' : 'rgba(255,255,255,0.06)'; ?>; color: #fff; text-decoration: none; border: 1px solid <?php echo $sortBy === 'stock' ? 'rgba(23,162,184,0.4)' : 'rgba(255,255,255,0.1)'; ?>; cursor: pointer; font-weight: 600; font-size: 13px; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); white-space: nowrap; box-shadow: <?php echo $sortBy === 'stock' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 12px 28px rgba(23,162,184,0.3)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='<?php echo $sortBy === 'stock' ? '0 8px 20px rgba(23,162,184,0.2)' : '0 2px 8px rgba(0,0,0,0.2)'; ?>'"
                                 <i class="fas fa-chart-column" style="margin-right: 5px;"></i> Qty
                             </a>
                         </div>
@@ -2019,7 +2021,7 @@ if ($poItemsQuery) {
                                     <i class="fas fa-arrow-<?php echo $sortOrder === 'asc' ? 'down' : 'up'; ?>" style="margin-left: 5px; font-size: 11px; opacity: 0.7;"></i>
                                 <?php endif; ?>
                             </th>
-                            <th>GROUP</th>
+                            <th>SERIAL NUMBER</th>
                             <th>UOM</th>
                             <th style="cursor: pointer; user-select: none; color: #ff4444;" onclick="sortTable('stock')">
                                 INVENTORY
@@ -2087,14 +2089,8 @@ if ($poItemsQuery) {
                             <td <?php echo $fileTooltip; ?> style="<?php echo $item['source_file'] ? 'cursor: help; text-decoration: underline dotted; text-decoration-color: #888;' : ''; ?>"><?php echo htmlspecialchars($itemsDisplay); ?></td>
                             <td><?php echo htmlspecialchars($item['name']); ?></td>
                             <td style="text-align: center; font-weight: 500;">
-                                <span style="color: #4a90e2; font-size: 13px;">
-                                    <?php 
-                                        if (strpos($item['grouping'], 'Multi') !== false) {
-                                            echo '🔵 ' . htmlspecialchars($item['grouping']);
-                                        } else {
-                                            echo '🟡 ' . htmlspecialchars($item['grouping']);
-                                        }
-                                    ?>
+                                <span style="color: #4a90e2; font-size: 13px; font-family: 'Courier New', monospace;">
+                                    <?php echo htmlspecialchars($item['serial_no'] ?: $item['code']); ?>
                                 </span>
                             </td>
                             <td style="text-align: center;">UNITS</td>
@@ -2398,7 +2394,7 @@ if ($poItemsQuery) {
                         placeholder="Type item code or select from list..." 
                         list="itemList"
                         required
-                        style="width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(244, 208, 63, 0.25); background: linear-gradient(135deg, rgba(30, 42, 56, 0.6) 0%, rgba(20, 30, 45, 0.8) 100%); color: #ffffff; font-family: 'Poppins', sans-serif; font-size: 14px; box-sizing: border-box; transition: all 0.3s ease;"
+                        style="width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(244, 208, 63, 0.25); background: linear-gradient(135deg, rgba(30, 42, 56, 0.6) 0%, rgba(20, 30, 45, 0.8) 100%); color: #ffffff; font-family: Verdana, sans-serif; font-size: 14px; box-sizing: border-box; transition: all 0.3s ease;"
                     >
                     <datalist id="itemList">
                         <?php 
@@ -2435,7 +2431,7 @@ if ($poItemsQuery) {
                         id="orderStatus" 
                         name="status" 
                         required
-                        style="width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(244, 208, 63, 0.25); background: linear-gradient(135deg, rgba(30, 42, 56, 0.6) 0%, rgba(20, 30, 45, 0.8) 100%); color: #ffffff; font-family: 'Poppins', sans-serif; font-size: 14px; cursor: pointer; box-sizing: border-box; transition: all 0.3s ease;"
+                        style="width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(244, 208, 63, 0.25); background: linear-gradient(135deg, rgba(30, 42, 56, 0.6) 0%, rgba(20, 30, 45, 0.8) 100%); color: #ffffff; font-family: Verdana, sans-serif; font-size: 14px; cursor: pointer; box-sizing: border-box; transition: all 0.3s ease;"
                     >
                         <option value="">-- Select Status --</option>
                         <option value="Pending">Pending</option>
@@ -2520,7 +2516,7 @@ if ($poItemsQuery) {
                         id="editOrderStatus" 
                         name="status" 
                         required
-                        style="width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(244, 208, 63, 0.25); background: linear-gradient(135deg, rgba(30, 42, 56, 0.6) 0%, rgba(20, 30, 45, 0.8) 100%); color: #ffffff; font-family: 'Poppins', sans-serif; font-size: 14px; cursor: pointer; box-sizing: border-box; transition: all 0.3s ease;"
+                        style="width: 100%; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(244, 208, 63, 0.25); background: linear-gradient(135deg, rgba(30, 42, 56, 0.6) 0%, rgba(20, 30, 45, 0.8) 100%); color: #ffffff; font-family: Verdana, sans-serif; font-size: 14px; cursor: pointer; box-sizing: border-box; transition: all 0.3s ease;"
                     >
                         <option value="Pending">Pending</option>
                         <option value="Processing">Processing</option>
@@ -2865,10 +2861,10 @@ if ($poItemsQuery) {
             // Build order details HTML placeholder
             let orderDetailsHTML = `
                 <!-- Order Details Section (Logbook) -->
-                <div style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, rgba(52, 152, 219, 0.12) 0%, rgba(52, 152, 219, 0.05) 100%); border: 2px solid rgba(52, 152, 219, 0.3); border-radius: 14px;">
+                <div style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, rgba(52, 152, 219, 0.08) 0%, rgba(52, 152, 219, 0.03) 100%); border: 2px solid rgba(52, 152, 219, 0.2); border-radius: 14px;">
                     <label style="
                         font-size: 13px;
-                        color: #a0a0a0;
+                        color: #666666;
                         text-transform: uppercase;
                         letter-spacing: 1.5px;
                         display: block;
@@ -2877,26 +2873,26 @@ if ($poItemsQuery) {
                     "><i class="fas fa-book" style="margin-right: 8px; color: #3498db;"></i>Order Logbook</label>
                     <div style="
                         padding: 20px;
-                        background: rgba(255, 255, 255, 0.02);
-                        border: 1px solid rgba(52, 152, 219, 0.2);
+                        background: #f8f9fa;
+                        border: 1px solid rgba(52, 152, 219, 0.15);
                         border-radius: 12px;
                         text-align: center;
                     ">
-                        <span style="font-size: 14px; color: #a0a0a0;"><i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i>Loading order history...</span>
+                        <span style="font-size: 14px; color: #888888;"><i class="fas fa-spinner fa-spin" style="margin-right: 8px;"></i>Loading order history...</span>
                     </div>
                 </div>
             `;
             
             modal.innerHTML = `
                 <div style="
-                    background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
+                    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
                     border-radius: 20px;
                     padding: 0;
                     max-width: 90vw;
                     max-height: 90vh;
                     width: 90%;
-                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.1);
-                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.08);
+                    border: 1px solid rgba(0, 0, 0, 0.08);
                     animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
                     overflow: hidden;
                     overflow-y: auto;
@@ -2951,7 +2947,7 @@ if ($poItemsQuery) {
                         <div style="margin-bottom: 24px;">
                             <label style="
                                 font-size: 12px;
-                                color: #a0a0a0;
+                                color: #666666;
                                 text-transform: uppercase;
                                 letter-spacing: 1px;
                                 display: block;
@@ -2960,10 +2956,10 @@ if ($poItemsQuery) {
                             ">Item Code</label>
                             <div style="
                                 padding: 14px 16px;
-                                background: rgba(255, 255, 255, 0.05);
-                                border: 1px solid rgba(255, 255, 255, 0.1);
+                                background: #f5f5f5;
+                                border: 1px solid #ddd;
                                 border-radius: 12px;
-                                color: #f4d03f;
+                                color: #d4a017;
                                 font-size: 16px;
                                 font-weight: 700;
                                 font-family: 'Courier New', monospace;
@@ -2975,7 +2971,7 @@ if ($poItemsQuery) {
                         <div style="margin-bottom: 24px;">
                             <label style="
                                 font-size: 12px;
-                                color: #a0a0a0;
+                                color: #666666;
                                 text-transform: uppercase;
                                 letter-spacing: 1px;
                                 display: block;
@@ -2984,10 +2980,10 @@ if ($poItemsQuery) {
                             ">Item Name</label>
                             <div style="
                                 padding: 14px 16px;
-                                background: rgba(255, 255, 255, 0.05);
-                                border: 1px solid rgba(255, 255, 255, 0.1);
+                                background: #f5f5f5;
+                                border: 1px solid #ddd;
                                 border-radius: 12px;
-                                color: #e0e0e0;
+                                color: #333333;
                                 font-size: 15px;
                                 line-height: 1.5;
                                 word-break: break-word;
@@ -2998,7 +2994,7 @@ if ($poItemsQuery) {
                         <div style="margin-bottom: 24px;">
                             <label style="
                                 font-size: 12px;
-                                color: #a0a0a0;
+                                color: #666666;
                                 text-transform: uppercase;
                                 letter-spacing: 1px;
                                 display: block;
@@ -3007,8 +3003,8 @@ if ($poItemsQuery) {
                             ">Current Stock</label>
                             <div style="
                                 padding: 16px;
-                                background: linear-gradient(135deg, rgba(23, 162, 184, 0.1) 0%, rgba(19, 132, 150, 0.1) 100%);
-                                border: 2px solid rgba(23, 162, 184, 0.3);
+                                background: linear-gradient(135deg, rgba(23, 162, 184, 0.08) 0%, rgba(19, 132, 150, 0.05) 100%);
+                                border: 2px solid rgba(23, 162, 184, 0.2);
                                 border-radius: 12px;
                                 text-align: center;
                             ">
@@ -3020,7 +3016,7 @@ if ($poItemsQuery) {
                                 ">${currentStock.toLocaleString()}</div>
                                 <div style="
                                     font-size: 12px;
-                                    color: #a0a0a0;
+                                    color: #888888;
                                     font-weight: 600;
                                     margin-bottom: 8px;
                                 ">UNITS</div>
@@ -3045,13 +3041,13 @@ if ($poItemsQuery) {
                         <div style="
                             margin-bottom: 28px;
                             padding: 16px;
-                            background: rgba(255, 255, 255, 0.03);
-                            border-left: 4px solid rgba(23, 162, 184, 0.5);
+                            background: #f0f8fc;
+                            border-left: 4px solid rgba(23, 162, 184, 0.6);
                             border-radius: 8px;
                         ">
                             <div style="
                                 font-size: 13px;
-                                color: #a0a0a0;
+                                color: #555555;
                                 line-height: 1.6;
                             ">
                                 <i class="fas fa-info-circle" style="margin-right: 8px; color: #17a2b8;"></i>
@@ -3902,7 +3898,7 @@ if ($poItemsQuery) {
                             border-radius: 8px;
                             background: #FFFFFF;
                             color: #000000;
-                            font-family: 'Poppins', sans-serif;
+                            font-family: Verdana, sans-serif;
                             font-size: 13px;
                         ">
                     </div>
@@ -3916,7 +3912,7 @@ if ($poItemsQuery) {
                             border-radius: 8px;
                             background: #FFFFFF;
                             color: #000000;
-                            font-family: 'Poppins', sans-serif;
+                            font-family: Verdana, sans-serif;
                             font-size: 13px;
                         ">
                     </div>
@@ -3935,7 +3931,7 @@ if ($poItemsQuery) {
                             border-radius: 8px;
                             background: #FFFFFF;
                             color: #000000;
-                            font-family: 'Poppins', sans-serif;
+                            font-family: Verdana, sans-serif;
                             font-size: 14px;
                             font-weight: 600;
                         ">
@@ -4785,7 +4781,7 @@ if ($poItemsQuery) {
                     margin: 0;
                     font-weight: 700;
                     word-break: break-word;
-                    font-family: 'Poppins', sans-serif;
+                    font-family: Verdana, sans-serif;
                     letter-spacing: 0.3px;
                 " id="deleteFileName"></p>
             </div>
@@ -4831,7 +4827,7 @@ if ($poItemsQuery) {
                     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
                     letter-spacing: 0.5px;
-                    font-family: 'Poppins', sans-serif;
+                    font-family: Verdana, sans-serif;
                 "
                 onmouseover="this.style.background='linear-gradient(135deg, rgba(120, 140, 170, 0.5) 0%, rgba(100, 120, 150, 0.4) 100%)'; this.style.borderColor='rgba(220, 230, 250, 0.5)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(0, 0, 0, 0.3)';"
                 onmouseout="this.style.background='linear-gradient(135deg, rgba(100, 120, 150, 0.4) 0%, rgba(80, 100, 130, 0.3) 100%)'; this.style.borderColor='rgba(200, 210, 230, 0.3)'; this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0, 0, 0, 0.2)';">
@@ -4850,7 +4846,7 @@ if ($poItemsQuery) {
                     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                     box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
                     letter-spacing: 0.5px;
-                    font-family: 'Poppins', sans-serif;
+                    font-family: Verdana, sans-serif;
                     position: relative;
                     overflow: hidden;
                 "

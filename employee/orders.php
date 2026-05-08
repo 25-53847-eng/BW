@@ -6,7 +6,7 @@ if (empty($_SESSION['user_id'])) {
 }
 
 require_once 'db_config.php';
-require_once '../api/permission-helper.php';
+require_once 'api/permission-helper.php';
 
 $canCreateOrder = isPermissionEnabled('inventory_create_po', $conn);
 $canDeleteOrder = isPermissionEnabled('inventory_create_po', $conn);

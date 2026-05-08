@@ -1,15 +1,10 @@
 <?php
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 $currentPage = basename($_SERVER['PHP_SELF'] ?? '');
+$isStandalone = realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__;
 $scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '/index.php');
 $basePath = rtrim(dirname($scriptName), '/');
 $basePath = $basePath === '/' ? '' : $basePath;
 
-// Define all menu items
 $menuItems = [
     ['label' => 'Dashboard', 'href' => 'index.php', 'icon' => 'fas fa-chart-line', 'pages' => ['index.php']],
     ['label' => 'Sales Overview', 'href' => 'sales-overview.php', 'icon' => 'fas fa-chart-pie', 'pages' => ['sales-overview.php']],
@@ -25,6 +20,28 @@ $menuItems = [
     ['label' => 'Warranty Items', 'href' => 'warranty-replacements.php', 'icon' => 'fas fa-wrench', 'pages' => ['warranty-replacements.php']],
     ['label' => 'Settings', 'href' => 'settings.php', 'icon' => 'fas fa-cog', 'pages' => ['settings.php', 'profile.php', 'help.php']],
 ];
+
+if ($isStandalone):
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidebar Preview</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body { margin: 0; }
+        .sidebar { top: 0; height: 100vh; }
+    </style>
+</head>
+<body>
+<?php
+endif;
 ?>
 <aside class="sidebar" id="sidebar">
     <div class="sidebar-content">
@@ -46,3 +63,7 @@ $menuItems = [
         <p class="sidebar-company-year">© 2025</p>
     </div>
 </aside>
+<?php if ($isStandalone): ?>
+</body>
+</html>
+<?php endif; ?>

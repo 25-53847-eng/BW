@@ -1,12 +1,12 @@
 <?php
 session_start();
 if (empty($_SESSION['user_id'])) {
-    header('Location: ../login.php', true, 302);
+    header('Location: login.php', true, 302);
     exit;
 }
 
-require_once '../db_config.php';
-require_once '../api/permission-helper.php';
+require_once 'db_config.php';
+require_once 'api/permission-helper.php';
 
 function inq_id($id) {
     return 'INQ-' . str_pad((string) $id, 3, '0', STR_PAD_LEFT);
@@ -44,21 +44,11 @@ $fetch->close();
 
 $inquiryRefId = inq_id($inquiry['id']);
 
-// Check permissions
-$canEditInquiry = isPermissionEnabled('inquiry_edit_records', $conn);
-$canDeleteInquiry = isPermissionEnabled('inquiry_delete_records', $conn);
-
 // Handle POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
     if ($action === 'update_inquiry') {
-        // Check permission before allowing edit
-        if (!$canEditInquiry) {
-            $_SESSION['inquiry_detail_flash'] = ['type' => 'error', 'message' => 'You do not have permission to edit inquiries.'];
-            header('Location: inquiry-details.php?id=' . $inquiryId, true, 302);
-            exit;
-        }
         $customer = trim($_POST['customer'] ?? '');
         $orderDate = trim($_POST['order_date'] ?? '');
         $itemCode = trim($_POST['item_code'] ?? '');
@@ -139,11 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $stmt = $conn->prepare($updateSql);
             if ($stmt) {
-                $stmt->bind_param('ssssiddssssiisi',
-                    $customer, $orderDate, $itemCode, $itemName, $quantity, $unitPrice, $totalAmount,
-                    $poNumber, $poStatus, $notes, $deliveryMonth, $deliveryDay, $deliveryYear, $deliveryDate,
-                    $inquiryId
-                );
+                $stmt->bind_param('ssssiddssssiisi', $customer, $orderDate, $itemCode, $itemName, $quantity, $unitPrice, $totalAmount, $poNumber, $poStatus, $notes, $deliveryMonth, $deliveryDay, $deliveryYear, $deliveryDate, $inquiryId);
                 if ($stmt->execute()) {
                     $_SESSION['inquiry_detail_flash'] = ['type' => 'success', 'message' => 'Inquiry updated successfully.'];
                 } else {
@@ -160,12 +146,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'delete_inquiry') {
-        // Check permission before allowing delete
-        if (!$canDeleteInquiry) {
-            $_SESSION['inquiry_detail_flash'] = ['type' => 'error', 'message' => 'You do not have permission to delete inquiries.'];
-            header('Location: inquiry-details.php?id=' . $inquiryId, true, 302);
-            exit;
-        }
         $deleteSql = "DELETE FROM delivery_records WHERE id = ? AND company_name = 'Inquiry'";
         $stmt = $conn->prepare($deleteSql);
         if ($stmt) {
@@ -184,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$autoEditMode = isset($_GET['edit']) && $canEditInquiry;
+$autoEditMode = isset($_GET['edit']);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -199,7 +179,7 @@ $autoEditMode = isset($_GET['edit']) && $canEditInquiry;
     <noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <nav class="navbar">
@@ -212,7 +192,7 @@ $autoEditMode = isset($_GET['edit']) && $canEditInquiry;
                 </button>
                 <div class="logo">
                     <a href="index.php" style="display:flex;align-items:center;">
-                        <img src="../assets/logo.png" alt="Andison" style="height:48px;width:auto;object-fit:contain;">
+                        <img src="assets/logo.png" alt="Andison" style="height:48px;width:auto;object-fit:contain;">
                     </a>
                 </div>
             </div>
@@ -230,7 +210,7 @@ $autoEditMode = isset($_GET['edit']) && $canEditInquiry;
                         <a href="settings.php"><i class="fas fa-cog"></i> Settings</a>
                         <a href="help.php"><i class="fas fa-question-circle"></i> Help</a>
                         <hr>
-                        <a href="../logout.php" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        <a href="logout.php" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>
             </div>
@@ -297,12 +277,12 @@ $autoEditMode = isset($_GET['edit']) && $canEditInquiry;
                         <div style="padding: 11px 14px; background: #f8f9fa; border-radius: 8px; color: #2c3e50; font-size: 14px; min-height: 60px; line-height: 1.5;"><?php echo nl2br(h($inquiry['notes'])) ?: '—'; ?></div>
                     </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <?php if ($canEditInquiry): ?>
+                        <?php if (isPermissionEnabled('inquiry_edit_records', $conn)): ?>
                         <a href="inquiry-details.php?id=<?php echo $inquiryId; ?>&edit=1" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border-radius: 8px; background: linear-gradient(135deg, #f4d03f 0%, #f9d76a 100%); border: none; color: #17324d; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s ease; text-decoration: none;" onmouseover="this.style.transform='translateY(-2px)';" onmouseout="this.style.transform='translateY(0)';">
                             <i class="fas fa-edit"></i> Edit
                         </a>
                         <?php endif; ?>
-                        <?php if ($canDeleteInquiry): ?>
+                        <?php if (isPermissionEnabled('inquiry_delete_records', $conn)): ?>
                         <button type="button" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 28px; border-radius: 8px; background: #e74c3c; border: none; color: #ffffff; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.opacity='0.9';" onmouseout="this.style.opacity='1';" onclick="document.getElementById('deleteConfirmModal').style.display='flex';"> 
                             <i class="fas fa-trash"></i> Delete
                         </button>

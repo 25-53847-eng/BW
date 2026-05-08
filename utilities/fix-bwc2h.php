@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require '../db_config.php';
 
 // Update recent BWC2-H records where sold_to is empty - populate it from company_name

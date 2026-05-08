@@ -202,7 +202,7 @@ while ($row = $pos_result->fetch_assoc()) {
             border-radius: 8px;
             background: rgba(0,0,0,0.3);
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
         .modal-actions {
             display: flex;

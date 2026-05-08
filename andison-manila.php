@@ -378,7 +378,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             border: 1px solid rgba(255,255,255,0.14);
             background: rgba(255,255,255,0.08);
             color: #e2e8f0;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             box-sizing: border-box;
             transition: border-color 0.2s;
@@ -408,7 +408,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             border-radius: 8px;
             background: rgba(255,255,255,0.08);
             color: #d4deea;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
@@ -445,7 +445,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             border: 1px solid rgba(255,255,255,0.18);
             background: rgba(255,255,255,0.08);
             color: #d4deea;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             font-weight: 500;
             cursor: pointer;
@@ -519,7 +519,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             color: #fff;
             cursor: pointer;
             font-weight: 600;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             text-decoration: none;
             display: inline-flex;
@@ -655,7 +655,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             border: 1px solid rgba(255,255,255,0.15);
             background: rgba(255,255,255,0.08);
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             transition: all 0.3s;
             width: 100%; box-sizing: border-box;
@@ -667,9 +667,9 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
         .form-group textarea { resize: vertical; min-height: 60px; }
         .input-hint { display: block; font-size: 11px; color: #8899a8; margin-top: 4px; font-style: italic; }
         .form-actions { display: flex; gap: 15px; margin-top: 20px; justify-content: flex-end; }
-        .btn-submit { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-submit { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: #fff; border: none; padding: 12px 28px; border-radius: 8px; font-family: Verdana, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
         .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(46,204,113,0.35); }
-        .btn-cancel-form { background: rgba(255,255,255,0.1); color: #a0a0a0; border: none; padding: 12px 28px; border-radius: 8px; font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
+        .btn-cancel-form { background: rgba(255,255,255,0.1); color: #a0a0a0; border: none; padding: 12px 28px; border-radius: 8px; font-family: Verdana, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s; }
         .btn-cancel-form:hover { background: rgba(255,255,255,0.15); color: #fff; }
 
         /* Light mode overrides */

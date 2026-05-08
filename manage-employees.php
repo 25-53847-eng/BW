@@ -319,7 +319,7 @@ if ($result) {
             border: 1px solid rgba(91, 188, 255, 0.2);
             border-radius: 8px;
             color: #e3f2fd;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             transition: all 0.2s ease;
         }

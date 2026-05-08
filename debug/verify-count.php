@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 $_SESSION['user_id'] = 14;
 require '../db_config.php';

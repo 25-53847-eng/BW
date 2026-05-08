@@ -245,7 +245,7 @@ if ($warrantyTableExists) {
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             transition: all 0.3s ease;
         }
         
@@ -288,7 +288,7 @@ if ($warrantyTableExists) {
             border-radius: 8px;
             padding: 10px 14px;
             color: #ffffff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
         }
         
@@ -506,7 +506,7 @@ if ($warrantyTableExists) {
             background: rgba(255, 255, 255, 0.05);
             color: #e0e0e0;
             cursor: pointer;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             font-weight: 600;
             transition: all 0.3s ease;
@@ -544,7 +544,7 @@ if ($warrantyTableExists) {
             border-radius: 8px;
             padding: 10px 14px;
             color: #e0e0e0;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             flex: 1;
             min-width: 200px;
@@ -569,7 +569,7 @@ if ($warrantyTableExists) {
             font-size: 12px;
             font-weight: 600;
             cursor: pointer;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             transition: all 0.3s ease;
             white-space: nowrap;
         }
@@ -2185,7 +2185,7 @@ if ($warrantyTableExists) {
                 color: white;
                 padding: 16px 24px;
                 border-radius: 8px;
-                font-family: 'Poppins', sans-serif;
+                font-family: Verdana, sans-serif;
                 font-size: 14px;
                 font-weight: 600;
                 z-index: 10000;

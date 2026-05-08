@@ -121,7 +121,7 @@ if (empty($_SESSION['user_id'])) {
             border-radius: 8px;
             padding: 10px 14px;
             color: #e0e0e0;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             cursor: pointer;
         }
@@ -232,7 +232,7 @@ if (empty($_SESSION['user_id'])) {
             border-radius: 8px;
             font-size: 14px;
             font-weight: 600;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             cursor: pointer;
             transition: all 0.3s ease;
         }
@@ -434,7 +434,7 @@ if (empty($_SESSION['user_id'])) {
             border: 2px solid rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             color: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 14px;
             margin-bottom: 15px;
         }
@@ -686,13 +686,13 @@ if (empty($_SESSION['user_id'])) {
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label for="newName" style="color: #40538f; font-size: 12px; font-weight: 600;">New Username</label>
                             <input type="text" id="newName" name="name" placeholder="Enter new username" 
-                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: 'Poppins', sans-serif; font-size: 13px;"
+                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: Verdana, sans-serif; font-size: 13px;"
                                 required>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label for="namePassword" style="color: #40538f; font-size: 12px; font-weight: 600;">Current Password (for verification)</label>
                             <input type="password" id="namePassword" name="password" placeholder="Enter your current password" 
-                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: 'Poppins', sans-serif; font-size: 13px;"
+                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: Verdana, sans-serif; font-size: 13px;"
                                 required>
                         </div>
                         <button type="submit" class="btn-save" style="width: fit-content;">Update Username</button>
@@ -707,19 +707,19 @@ if (empty($_SESSION['user_id'])) {
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label for="currentPassword" style="color: #40538f; font-size: 12px; font-weight: 600;">Current Password</label>
                             <input type="password" id="currentPassword" name="current_password" placeholder="Enter your current password" 
-                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: 'Poppins', sans-serif; font-size: 13px;"
+                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: Verdana, sans-serif; font-size: 13px;"
                                 required>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label for="newPassword" style="color: #40538f; font-size: 12px; font-weight: 600;">New Password</label>
                             <input type="password" id="newPassword" name="new_password" placeholder="Enter new password (min 6 characters)" 
-                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: 'Poppins', sans-serif; font-size: 13px;"
+                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: Verdana, sans-serif; font-size: 13px;"
                                 required>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 5px;">
                             <label for="confirmPassword" style="color: #40538f; font-size: 12px; font-weight: 600;">Confirm New Password</label>
                             <input type="password" id="confirmPassword" name="confirm_password" placeholder="Confirm new password" 
-                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: 'Poppins', sans-serif; font-size: 13px;"
+                                style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; padding: 10px 12px; color: #6e6161; font-family: Verdana, sans-serif; font-size: 13px;"
                                 required>
                         </div>
                         <button type="submit" class="btn-save" style="width: fit-content;">Change Password</button>

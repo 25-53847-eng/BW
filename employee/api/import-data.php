@@ -895,6 +895,12 @@ try {
             $sold_to_month = isset($mapped['sold_to_month']) ? trim(strval($mapped['sold_to_month'])) : '';
             $sold_to_day = isset($mapped['sold_to_day']) ? intval($mapped['sold_to_day']) : 0;
             $groupings = isset($mapped['groupings']) ? trim(strval($mapped['groupings'])) : '';
+            
+            // If groupings is empty but unit_type is provided, use unit_type as groupings
+            if (empty($groupings) && !empty($unit_type)) {
+                $groupings = $unit_type;
+            }
+            
             $highlight_color = isset($mapped['highlight_color']) ? trim(strval($mapped['highlight_color'])) : '';
             $cell_styles = '';
 
@@ -1154,17 +1160,18 @@ try {
                 $warranty_flag = 1;
                 $red_text_detected = 1;
                 $last_id = null; // Use NULL instead of 0 to satisfy foreign key constraint
+                $owner_user_id = intval($_SESSION['user_id'] ?? 0);
                 
                 $warranty_sql = "INSERT INTO warranty_replacements 
                     (delivery_record_id, invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, 
                      item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, 
-                     dataset_name, warranty_flag, warranty_date, red_text_detected)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                     dataset_name, warranty_flag, warranty_date, red_text_detected, owner_user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                 
                 $warranty_stmt = $conn->prepare($warranty_sql);
                 if ($warranty_stmt) {
                     $warranty_stmt->bind_param(
-                        'issiiissssssissssssssi',
+                        'issiiissssssisssssssii',
                         $last_id,
                         $invoice_no,
                         $serial_no,
@@ -1186,7 +1193,8 @@ try {
                         $dataset_name,
                         $warranty_flag,
                         $warranty_date,
-                        $red_text_detected
+                        $red_text_detected,
+                        $owner_user_id
                     );
                     
                     if (!$warranty_stmt->execute()) {

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 session_start();
 require '../db_config.php';
 
@@ -95,13 +95,13 @@ try {
     
     $conn->commit();
     
-    echo "\n✓ Consolidation complete!\n";
+    echo "\n? Consolidation complete!\n";
     echo "  - Consolidated items: $consolidated_count\n";
     echo "  - Original records deleted: $original_count\n";
     
 } catch (Exception $e) {
     $conn->rollback();
-    echo "✗ Error: " . $e->getMessage() . "\n";
+    echo "? Error: " . $e->getMessage() . "\n";
     exit(1);
 }
 ?>

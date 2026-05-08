@@ -396,9 +396,69 @@ if ($stats['total_delivered'] > 0) {
     $metric_sold_insights[] = "Conversion ratio: <strong>{$conversion}%</strong> of deliveries";
 }
 
+// Calculate company trend - compare current vs previous month unique companies
+$current_month_companies = 0;
+$prev_month_companies = 0;
+$company_trend_percent = 0;
+$company_trend_direction = 'neutral';
+
+$sql_current = "
+    SELECT COUNT(DISTINCT sold_to) as count
+    FROM delivery_records
+    WHERE delivery_month = ? AND sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != ''
+      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter;
+$stmt = $conn->prepare($sql_current);
+if ($stmt) {
+    $params_with_month = array_merge([$current_month_name], $dataset_filter_params);
+    $typeStr = str_repeat('s', count($params_with_month));
+    $stmt->bind_param($typeStr, ...$params_with_month);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $current_month_companies = intval($row['count']);
+    }
+    $stmt->close();
+}
+
+$sql_prev = "
+    SELECT COUNT(DISTINCT sold_to) as count
+    FROM delivery_records
+    WHERE delivery_month = ? AND sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != ''
+      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter;
+$stmt = $conn->prepare($sql_prev);
+if ($stmt) {
+    $params_with_month = array_merge([$prev_month_name], $dataset_filter_params);
+    $typeStr = str_repeat('s', count($params_with_month));
+    $stmt->bind_param($typeStr, ...$params_with_month);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $prev_month_companies = intval($row['count']);
+    }
+    $stmt->close();
+}
+
+// Calculate percentage change
+if ($prev_month_companies > 0) {
+    $company_trend_percent = round((($current_month_companies - $prev_month_companies) / $prev_month_companies) * 100);
+    $company_trend_direction = $company_trend_percent > 0 ? 'up' : ($company_trend_percent < 0 ? 'down' : 'neutral');
+} elseif ($current_month_companies > 0) {
+    $company_trend_percent = 100; // New clients this month
+    $company_trend_direction = 'up';
+}
+
 $metric_companies_insights = [];
 $metric_companies_insights[] = "<strong>{$stats['total_companies']}</strong> unique client companies served";
-$metric_companies_insights[] = "<strong>↓ 35%</strong> fewer new clients vs last period";
+if ($stats['total_companies'] > 0) {
+    $metric_companies_insights[] = "Serving <strong>{$stats['total_companies']}</strong> active clients this period";
+}
+if ($current_month_companies > 0) {
+    $metric_companies_insights[] = "<strong>{$current_month_companies}</strong> new/active clients in {$current_month_name}";
+}
+if ($company_trend_percent !== 0) {
+    $trend_text = $company_trend_direction === 'up' ? "increased" : "decreased";
+    $metric_companies_insights[] = "Client base {$trend_text} by <strong>" . abs($company_trend_percent) . "%</strong> vs {$prev_month_name}";
+}
 if (count($top_clients) > 0) {
     $metric_companies_insights[] = "Top client: <strong>{$top_clients[0]['company_name']}</strong>";
     if (count($top_clients) >= 3) {
@@ -442,10 +502,7 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BW Gas Detector Sales  - Andison Industrial</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet"></noscript>
+    <!-- Poppins font import removed - using Verdana instead -->
     <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
     <link rel="stylesheet" href="css/style.css">
@@ -630,9 +687,9 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
                 <div class="metric-info">
                     <span class="metric-label">Client Companies</span>
                     <span class="metric-value"><?php echo $stats['total_companies']; ?></span>
-                    <div class="metric-trend down">
-                        <i class="fas fa-arrow-down"></i>
-                        <span>35%</span>
+                    <div class="metric-trend <?php echo $company_trend_direction; ?>">
+                        <i class="fas fa-arrow-<?php echo $company_trend_direction === 'up' ? 'up' : ($company_trend_direction === 'down' ? 'down' : 'right'); ?>"></i>
+                        <span><?php echo abs($company_trend_percent); ?>%</span>
                     </div>
                 </div>
                 <canvas id="sparkline3" class="sparkline-chart"></canvas>

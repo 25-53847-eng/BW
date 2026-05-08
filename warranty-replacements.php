@@ -187,7 +187,7 @@ if ($companies_result) {
             cursor: pointer;
             font-weight: 700;
             font-size: 12px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             transition: all 0.2s ease;
             white-space: nowrap;
         }
@@ -281,7 +281,7 @@ if ($companies_result) {
             color: #fff;
             padding: 8px 12px;
             font-size: 13px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
 
         .filter-input input:focus,
@@ -305,7 +305,7 @@ if ($companies_result) {
             cursor: pointer;
             font-weight: 600;
             font-size: 12px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             transition: all 0.3s ease;
         }
 
@@ -323,7 +323,7 @@ if ($companies_result) {
             cursor: pointer;
             font-weight: 600;
             font-size: 12px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             transition: all 0.3s ease;
         }
 
@@ -612,7 +612,7 @@ if ($companies_result) {
             color: #162f47;
             padding: 9px 12px;
             font-size: 13px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
 
         .modal-field input::placeholder,
@@ -787,7 +787,7 @@ if ($companies_result) {
             font-size: 14px;
             color: #1f2937;
             background: #fff;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
 
         .system-alert-actions {
@@ -801,7 +801,7 @@ if ($companies_result) {
         .system-alert-btn {
             border: none;
             border-radius: 4px;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-weight: 600;
             font-size: 14px;
             padding: 10px 20px;

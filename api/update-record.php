@@ -47,6 +47,11 @@ try {
     // Main fields from form
     $invoice_no = trim($data['invoice_no'] ?? '');
     $item_code = trim($data['item_code'] ?? '');
+    $unit_type = strtolower(trim($data['unit_type'] ?? ''));
+    $allowedUnitTypes = ['1a', '1b', '2a', '2b', '3a', '4a'];
+    if ($unit_type !== '' && !in_array($unit_type, $allowedUnitTypes, true)) {
+        $unit_type = '';
+    }
     $item_name = trim($data['item_name'] ?? '');
     $status = trim($data['status'] ?? 'Delivered');
     
@@ -85,6 +90,7 @@ try {
             delivery_year = ?, 
             delivery_date = ?, 
             item_code = ?, 
+            unit_type = ?,
             item_name = ?, 
             company_name = ?, 
             transferred_to = ?, 
@@ -107,7 +113,7 @@ try {
     }
 
     $stmt->bind_param(
-        'sssiissssssidsssssisi',
+        'sssiisissssssidsssssisi',
         $invoice_no,
         $serial_no,
         $delivery_month,
@@ -115,6 +121,7 @@ try {
         $delivery_year,
         $delivery_date,
         $item_code,
+        $unit_type,
         $item_name,
         $company_name,
         $transferred_to,

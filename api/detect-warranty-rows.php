@@ -17,7 +17,14 @@
  * }
  */
 
-// Start buffering FIRST
+// CRITICAL: Set JSON header at absolute start
+header('Content-Type: application/json; charset=utf-8');
+
+// Remove ALL whitespace before headers - NO OUTPUT BEFORE HEADERS!
+// Clean any previous output
+while (ob_get_level() > 0) {
+    ob_end_clean();
+}
 ob_start();
 
 // Set error handling IMMEDIATELY
@@ -45,16 +52,12 @@ set_exception_handler(function($e) {
         ob_end_clean();
     }
     http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
     error_log('Uncaught exception: ' . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'System error: ' . $e->getMessage()]);
     exit;
 });
 
-// Set JSON header IMMEDIATELY
-header('Content-Type: application/json; charset=utf-8');
-
-// Load PhpSpreadsheet - vendor output goes into main buffer from line 20, will be cleaned before response
+// Load PhpSpreadsheet - ensure vendor doesn't output anything
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;

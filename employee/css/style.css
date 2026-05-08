@@ -48,7 +48,7 @@ html.light-mode #pageLoader {
 }
 
 .loader-text {
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     font-size: 13px;
     color: #cbd5e1;
     letter-spacing: 0.5px;
@@ -595,7 +595,7 @@ body.light-mode .fa-chevron-right {
 html, body {
     width: 100%;
     height: 100%;
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     background-color: var(--color-dark-bg);
     color: var(--color-text-light);
 }
@@ -775,7 +775,7 @@ html, body {
     color: #f4d03f;
     font-size: 12px;
     cursor: pointer;
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     transition: all 0.2s ease;
 }
 
@@ -949,7 +949,7 @@ body.light-mode .notification:hover {
     gap: 10px;
     cursor: pointer;
     color: var(--color-text-light);
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     transition: var(--transition);
     font-size: 14px;
     white-space: nowrap;
@@ -1456,7 +1456,7 @@ html.light-mode .stat-label-ind {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
     box-shadow: 0 4px 15px rgba(244, 208, 63, 0.3);
 }
 
@@ -1646,7 +1646,7 @@ html.light-mode .btn-industrial.secondary {
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
-    font-family: 'Poppins', sans-serif;
+    font-family: Verdana, sans-serif;
 }
 
 .btn-primary:hover {

@@ -62,6 +62,11 @@ try {
     // Main fields from form
     $invoice_no = trim($data['invoice_no'] ?? '');
     $item_code = trim($data['item_code'] ?? '');
+    $unit_type = strtolower(trim($data['unit_type'] ?? ''));
+    $allowedUnitTypes = ['1a', '1b', '2a', '2b', '3a', '4a'];
+    if ($unit_type !== '' && !in_array($unit_type, $allowedUnitTypes, true)) {
+        $unit_type = '';
+    }
     $item_name = trim($data['item_name'] ?? '');
     $status = trim($data['status'] ?? 'Delivered');
     
@@ -92,8 +97,8 @@ try {
     
     // Insert into database
     $sql = "INSERT INTO delivery_records 
-            (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, delivery_date, item_code, item_name, company_name, transferred_to, sold_to, quantity, unit_price, status, highlight_color, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name, owner_user_id, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+            (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, delivery_date, item_code, unit_type, item_name, company_name, transferred_to, sold_to, quantity, unit_price, status, highlight_color, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name, owner_user_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
     
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -101,7 +106,7 @@ try {
     }
 
     $stmt->bind_param(
-        'ssissssssssiidssssissi',
+        'ssisssssssssiidssssissi',
         $invoice_no,
         $serial_no,
         $delivery_month,
@@ -109,6 +114,7 @@ try {
         $delivery_year,
         $delivery_date,
         $item_code,
+        $unit_type,
         $item_name,
         $company_name,
         $transferred_to,

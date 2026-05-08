@@ -175,7 +175,7 @@ $groupings = [
             overflow: hidden;
             cursor: pointer;
             transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
         .group-card:hover {
             transform: translateY(-4px);
@@ -298,7 +298,7 @@ $groupings = [
             display: flex;
             flex-direction: column;
             box-shadow: 0 24px 64px rgba(0,0,0,0.55);
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
         }
         .gmodal-header {
             padding: 22px 28px;
@@ -351,7 +351,7 @@ $groupings = [
             border-radius: 7px;
             padding: 10px 14px 10px 38px;
             color: var(--color-text-light);
-            font-family: 'Poppins', sans-serif;
+            font-family: Verdana, sans-serif;
             font-size: 13px;
             outline: none;
             box-sizing: border-box;

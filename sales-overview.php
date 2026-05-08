@@ -26,7 +26,7 @@ if (isset($_GET['year'])) {
 
 // Get available years for dropdown
 $available_years = [intval(date('Y'))];
-$r = $conn->query("SELECT DISTINCT delivery_year FROM delivery_records WHERE owner_user_id = {$_SESSION['user_id']} AND delivery_year > 0 AND delivery_year < 2100 ORDER BY delivery_year DESC LIMIT 50");
+$r = $conn->query("SELECT DISTINCT delivery_year FROM delivery_records WHERE delivery_year > 0 AND delivery_year < 2100 ORDER BY delivery_year DESC LIMIT 50");
 if ($r) {
     $available_years = [];
     while ($row = $r->fetch_assoc()) {
