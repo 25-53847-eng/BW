@@ -64,22 +64,20 @@ $inv_item_code = $conn->real_escape_string($inventory['item_code']);
 $inv_item_name = $conn->real_escape_string($inventory['item_name']);
 $inv_uom = $conn->real_escape_string($inventory['uom']);
 $inv_serial_no = $conn->real_escape_string($inventory['serial_no']);
-// For new sales, ALWAYS mark as 'to Andison Manila' so WHERE clause matches
-$inv_company_name = 'to Andison Manila';
-$inv_transferred_to = 'to Andison Manila';
+$inv_company_name = $conn->real_escape_string($inventory['company_name']);
+$inv_transferred_to = $conn->real_escape_string($inventory['transferred_to']);
 $inv_groupings = $conn->real_escape_string($inventory['groupings']);
-$inv_dataset_name = $conn->real_escape_string($inventory['dataset_name'] ?? '');
 
 // START TRANSACTION
 $conn->begin_transaction();
 
 try {
-    // 1. INSERT new sales record - MARK AS SALES TRANSACTION
+    // 1. INSERT new sales record
     $insert_sql = "INSERT INTO delivery_records (
         invoice_no, delivery_date, delivery_month, delivery_day, delivery_year,
         item_code, item_name, quantity, uom, serial_no,
         company_name, transferred_to, sold_to, sold_to_month, sold_to_day,
-        groupings, status, notes, dataset_name, record_type, created_at
+        groupings, status, notes, created_at
     ) VALUES (
         '$inv_invoice_no',
         '$delivery_date',
@@ -99,8 +97,6 @@ try {
         '$inv_groupings',
         'Delivered',
         '$notes',
-        '$inv_dataset_name',
-        'sales',
         NOW()
     )";
     

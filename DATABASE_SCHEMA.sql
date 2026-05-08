@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `delivery_records` (
   `unit_price` DECIMAL(15,2) DEFAULT 0 COMMENT 'Unit price for inquiry items',
   `total_amount` DECIMAL(15,2) DEFAULT 0 COMMENT 'Total amount (quantity * unit_price)',
   `groupings` VARCHAR(10) DEFAULT NULL COMMENT 'Product groupings (1A, 1B, 2A, 2B, 3A, 4A)',
+  `inventory_status` VARCHAR(50) DEFAULT NULL COMMENT 'Inventory classification: INVENTORY, Stock in Manila, or NULL for sales',
   `dataset_name` VARCHAR(255) DEFAULT NULL COMMENT 'Dataset name for categorization',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation timestamp',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record last update timestamp',
@@ -120,10 +121,4 @@ SELECT * FROM `vw_datasets`;
 CREATE OR REPLACE VIEW `warranty` AS
 SELECT * FROM `warranty_replacements`;
 
--- Insert sample data (optional)
-INSERT INTO delivery_records (delivery_month, delivery_day, item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes)
-VALUES 
-('January', 1, 'MCX3-BC1', 'BW Gas Detector - Model 3 BC1', 'Addison Industrial', 'Addison Industrial', 10, 'Delivered', '#FFF2CC', '{"company_name":"#FFF2CC"}', 'Sample delivery'),
-('January', 5, 'MCX3-FC1', 'BW Gas Detector - Model 3 FC1', 'Tech Solutions Ltd', 'Tech Solutions Ltd', 15, 'Delivered', '#D9EAF7', '{"company_name":"#D9EAF7"}', NULL),
-('February', 3, 'MCX3-MPCB', 'BW Gas Detector - Model 3 MPCB', 'Global Industries', 'Global Industries', 8, 'In Transit', NULL, NULL, 'Expected delivery by Feb 10')
-ON DUPLICATE KEY UPDATE quantity = VALUES(quantity), updated_at = CURRENT_TIMESTAMP;
+-- No hardcoded sample data - all data comes from Excel imports

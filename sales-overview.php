@@ -16,33 +16,52 @@ if (isset($_GET['dataset'])) {
     $_SESSION['active_dataset'] = $selected_dataset;
 }
 
-// Build dataset filter
+// Get selected year from URL or session (default to current year)
+$selected_year = isset($_GET['year']) ? intval($_GET['year']) : (isset($_SESSION['active_year']) ? intval($_SESSION['active_year']) : intval(date('Y')));
+
+// Update session if year is passed via GET
+if (isset($_GET['year'])) {
+    $_SESSION['active_year'] = $selected_year;
+}
+
+// Get available years for dropdown
+$available_years = [intval(date('Y'))];
+$r = $conn->query("SELECT DISTINCT delivery_year FROM delivery_records WHERE owner_user_id = {$_SESSION['user_id']} AND delivery_year > 0 AND delivery_year < 2100 ORDER BY delivery_year DESC LIMIT 50");
+if ($r) {
+    $available_years = [];
+    while ($row = $r->fetch_assoc()) {
+        $available_years[] = intval($row['delivery_year']);
+    }
+    if (empty($available_years)) {
+        $available_years = [intval(date('Y'))];
+    }
+}
+
+// Build dataset and year filter
 $dataset_filter = "";
 if ($selected_dataset !== 'all' && $selected_dataset !== '') {
     $safe_dataset = $conn->real_escape_string($selected_dataset);
     $dataset_filter = " AND dataset_name = '$safe_dataset'";
 }
 
+$year_filter = " AND delivery_year = $selected_year";
+$combined_filter = $dataset_filter . $year_filter;
+
 $allMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// Units SOLD to companies (records with company_name)
+// Units SOLD to companies (records with company_name) - ONLY 1A, 2A, 4A units
 $unitsSold = 0;
-$r = $conn->query("SELECT COALESCE(SUM(quantity),0) as t FROM delivery_records WHERE company_name IS NOT NULL AND company_name != ''$dataset_filter");
+$r = $conn->query("SELECT COALESCE(SUM(quantity),0) as t FROM delivery_records WHERE company_name IS NOT NULL AND company_name != '' AND unit_type IN ('1a', '2a', '4a')$combined_filter");
 if ($r && $row = $r->fetch_assoc()) $unitsSold = intval($row['t']);
 
-// Total deliveries (all records)
+// Total deliveries (all records) - ONLY 1A, 2A, 4A units
 $totalDeliveries = 0;
-$r = $conn->query("SELECT COUNT(*) as t FROM delivery_records WHERE 1=1$dataset_filter");
+$r = $conn->query("SELECT COUNT(*) as t FROM delivery_records WHERE 1=1 AND unit_type IN ('1a', '2a', '4a')$combined_filter");
 if ($r && $row = $r->fetch_assoc()) $totalDeliveries = intval($row['t']);
 
-// Unique products
-$uniqueProducts = 0;
-$r = $conn->query("SELECT COUNT(DISTINCT item_name) as t FROM delivery_records WHERE item_name IS NOT NULL AND item_name != ''$dataset_filter");
-if ($r && $row = $r->fetch_assoc()) $uniqueProducts = intval($row['t']);
-
-// Monthly sales data
+// Monthly sales data (ONLY 1A, 2A, 4A units)
 $monthly_sales = array_fill_keys($allMonths, 0);
-$r = $conn->query("SELECT delivery_month, COALESCE(SUM(quantity),0) AS total FROM delivery_records WHERE delivery_month IS NOT NULL AND delivery_month != ''$dataset_filter GROUP BY delivery_month");
+$r = $conn->query("SELECT delivery_month, COALESCE(SUM(quantity),0) AS total FROM delivery_records WHERE delivery_month IS NOT NULL AND delivery_month != '' AND unit_type IN ('1a', '2a', '4a')$combined_filter GROUP BY delivery_month");
 if ($r) {
     while ($row = $r->fetch_assoc()) {
         if (array_key_exists($row['delivery_month'], $monthly_sales))
@@ -50,16 +69,16 @@ if ($r) {
     }
 }
 
-// Top products
+// Top products (ONLY 1A, 2A, 4A units)
 $top_products = [];
-$r = $conn->query("SELECT item_name, SUM(quantity) as total_qty FROM delivery_records WHERE item_name IS NOT NULL AND item_name != ''$dataset_filter GROUP BY item_name ORDER BY total_qty DESC LIMIT 5");
+$r = $conn->query("SELECT item_name, item_code, SUM(quantity) as total_qty FROM delivery_records WHERE item_name IS NOT NULL AND item_name != '' AND unit_type IN ('1a', '2a', '4a')$combined_filter GROUP BY item_name ORDER BY total_qty DESC LIMIT 5");
 if ($r) {
     while ($row = $r->fetch_assoc()) $top_products[] = $row;
 }
 
 // Recent deliveries
 $recent_sales = [];
-$r = $conn->query("SELECT invoice_no, item_name, quantity, company_name, delivery_date, delivery_month, delivery_day FROM delivery_records WHERE 1=1$dataset_filter ORDER BY id DESC LIMIT 10");
+$r = $conn->query("SELECT invoice_no, item_name, quantity, company_name, delivery_date, delivery_month, delivery_day FROM delivery_records WHERE 1=1$combined_filter ORDER BY id DESC LIMIT 10");
 if ($r) {
     while ($row = $r->fetch_assoc()) $recent_sales[] = $row;
 }
@@ -105,11 +124,11 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
 
         .summary-cards {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: clamp(12px, 2vw, 20px);
             margin-bottom: clamp(20px, 3vw, 30px);
         }
-        @media (max-width: 1400px) { .summary-cards { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 1400px) { .summary-cards { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 1100px) { .summary-cards { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 600px) { .summary-cards { grid-template-columns: 1fr; } }
         
@@ -349,16 +368,6 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
                 <div class="value"><?php echo number_format($totalDeliveries); ?></div>
                 <div class="label">Total Deliveries</div>
             </div>
-            <div class="summary-card highlight">
-                <div class="icon"><i class="fas fa-cube"></i></div>
-                <div class="value"><?php echo number_format($uniqueProducts); ?></div>
-                <div class="label">Unique Products</div>
-            </div>
-            <div class="summary-card highlight">
-                <div class="icon"><i class="fas fa-percentage"></i></div>
-                <div class="value"><?php echo $totalDeliveries > 0 ? number_format(round($unitsSold / $totalDeliveries * 100, 1), 1) : 0; ?>%</div>
-                <div class="label">Sold Rate</div>
-            </div>
         </div>
 
         <!-- Monthly Overview -->
@@ -369,7 +378,17 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
 
         <div class="charts-grid">
             <div class="chart-card">
-                <h3><i class="fas fa-chart-bar"></i> Units Delivered per Month</h3>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="margin:0;font-size:16px;"><i class="fas fa-chart-bar"></i> Units Delivered per Month</h3>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:12px;color:#333;white-space:nowrap;">Year:</span>
+                        <select id="monthlyChartYearFilter" style="background:#0f1419;color:#e8eef8;border:1.5px solid #4a6fa5;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer;outline:none;min-width:70px;box-shadow:0 2px 6px rgba(0,0,0,0.4);">
+                            <?php foreach ($available_years as $y): ?>
+                            <option value="<?php echo $y; ?>" <?php echo $selected_year === $y ? 'selected' : ''; ?> style="background:#1a2a3a;color:#e8eef8;"><?php echo $y; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
                 <div class="chart-container chart-expandable" onclick="openChartPreview('monthlyUnitsChart','Units Delivered per Month')" style="position:relative;">
                     <canvas id="monthlyUnitsChart"></canvas>
                     <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
@@ -438,15 +457,40 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
         const topQtys     = <?php echo $topQtys; ?>;
 
         const isLight = document.body.classList.contains('light-mode') || document.documentElement.classList.contains('light-mode');
-        const tcol = isLight ? '#333' : '#c8d6e8';
-        const gcol = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)';
-        const vibrantPalette = ['#ffb703', '#fb8500', '#00c2ff', '#3a86ff', '#06d6a0', '#ff4d9d', '#8338ec', '#4cc9f0', '#ff6d00', '#2ec4b6'];
+        const tcol = isLight ? '#333' : '#e8eef8';
+        const gcol = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)';
+        const vibrantPalette = ['#FFD700', '#00CED1', '#FF6B6B', '#4ECDC4', '#FFB347', '#87CEEB', '#FF69B4', '#90EE90', '#FFA500', '#20B2AA'];
+
+        let monthlyChart = null;
+
+        // Handle monthly chart year filter change
+        document.addEventListener('DOMContentLoaded', function() {
+            const yearFilter = document.getElementById('monthlyChartYearFilter');
+            if (yearFilter) {
+                yearFilter.addEventListener('change', function() {
+                    const selectedYear = this.value;
+                    const dataset = new URLSearchParams(window.location.search).get('dataset') || '';
+                    
+                    fetch('api/get-monthly-sales.php?year=' + selectedYear + (dataset ? '&dataset=' + dataset : ''))
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && monthlyChart) {
+                                const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                                const newData = months.map(m => data.monthly_sales[m] || 0);
+                                monthlyChart.data.datasets[0].data = newData;
+                                monthlyChart.update();
+                            }
+                        })
+                        .catch(err => console.error('Error fetching monthly sales:', err));
+                });
+            }
+        });
 
         // Monthly bar chart
         (function() {
             const ctx = document.getElementById('monthlyUnitsChart');
             if (!ctx) return;
-            new Chart(ctx, {
+            monthlyChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: monthLabels,

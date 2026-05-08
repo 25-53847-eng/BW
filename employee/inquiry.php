@@ -309,9 +309,9 @@ $canAddInquiry = is_inquiry_admin();
             white-space: nowrap;
         }
         .empty-state { padding: 48px 20px; text-align: center; color: #9fb1c5; }
-        .modal-backdrop { position: fixed; inset: 0; background: rgba(10, 16, 24, 0.72); display: none; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(10, 16, 24, 0.72); display: none; align-items: flex-start; justify-content: center; z-index: 9999; padding: 20px; padding-top: 80px; overflow-y: auto; }
         .modal-backdrop.show { display: flex; }
-        .modal-card { width: min(920px, 100%); background: linear-gradient(135deg, #1e2a38, #2a3f5f); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.35); padding: 22px; }
+        .modal-card { width: min(920px, 100%); background: linear-gradient(135deg, #1e2a38, #2a3f5f); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.35); padding: 22px; margin-bottom: 40px; }
         .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
         .modal-title { margin: 0; color: #fff; font-size: 22px; }
         .close-btn { background: transparent; border: none; color: #fff; font-size: 28px; cursor: pointer; line-height: 1; }

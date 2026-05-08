@@ -16,11 +16,6 @@ require_once 'api/dataset-status-helper.php';
 // Check if dataset is enabled
 $dataset_is_enabled = isDatasetEnabled($conn, $active_dataset);
 
-// Check permission for delivery records operations
-$canAddDelivery = isPermissionEnabled('delivery_add_records', $conn);
-$canEditDelivery = isPermissionEnabled('delivery_edit_records', $conn);
-$canDeleteDelivery = isPermissionEnabled('delivery_delete_records', $conn);
-
 function isLegendMarkerRow(array $row): bool {
     $groupings = strtolower(trim((string) ($row['groupings'] ?? '')));
     $invoice = strtolower(trim((string) ($row['invoice_no'] ?? '')));
@@ -36,12 +31,6 @@ function isLegendMarkerRow(array $row): bool {
         && strpos($itemCode, 'warranty replacement') !== false
         && (strpos($itemName, 'warranty to purchase') !== false || strpos($itemName, 'swapping') !== false)
         && (strpos($serialNo, 'purchase') !== false && strpos($serialNo, 'warranty') !== false);
-}
-
-function isWarrantyReplacementRow(array $row): bool {
-    $groupings = strtolower(trim((string) ($row['groupings'] ?? '')));
-    // Warranty replacement records should go to warranty items, not delivery records
-    return strpos($groupings, 'warranty replacement') !== false || strpos($groupings, '3a') !== false;
 }
 
 function isAndisonManilaRow(array $row): bool {
@@ -171,13 +160,32 @@ if ($selected_dataset !== 'all' && $selected_dataset !== '') {
 $owner_user_id = intval($_SESSION['user_id'] ?? 0);
 $owner_filter = "owner_user_id = {$owner_user_id} AND ";
 
-// Delivery Records page should never include inquiry/order staging rows, inventory items (no sold_to), or stock in manila.
-$delivery_where = "{$owner_filter}company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition') 
-    AND (sold_to IS NOT NULL AND sold_to != '') 
-    AND NOT (
-    LOWER(TRIM(COALESCE(sold_to, ''))) IN ('stock in manila')
-    OR LOWER(TRIM(COALESCE(sold_to, ''))) LIKE '%stock in manila%'
-)";
+// Delivery Records page should never include:
+// 1. Inquiry/order staging rows or Andison Manila transfers
+// 2. Warranty replacement records (identified by highlight_color in warranty-related colors: red, teal, pink)
+// Warranty colors: red (#EF4444, #FF0000, #DC2626, #FFC7CE, #F8CBAD, #F4AAAA, #C0504D),
+//                  teal (#14B8A6, #B7DEE8, #A7E3DE, #9DD9D2, #4BACC6),
+//                  pink (#EC4899, #E79CC8, #F4B6D7, #F8C8DC, #FF99CC)
+$warranty_colors = [
+    '#EF4444', '#FF0000', '#DC2626', '#FFC7CE', '#F8CBAD', '#F4AAAA', '#C0504D', // red
+    '#14B8A6', '#B7DEE8', '#A7E3DE', '#9DD9D2', '#4BACC6', // teal
+    '#EC4899', '#E79CC8', '#F4B6D7', '#F8C8DC', '#FF99CC' // pink
+];
+
+// Escape warranty colors for SQL query
+if (isset($conn) && $conn) {
+    $warranty_colors_escaped = array_map(fn($c) => "'" . $conn->real_escape_string($c) . "'", $warranty_colors);
+} else {
+    // Fallback: manually escape with quotes (connection should always be available)
+    $warranty_colors_escaped = array_map(fn($c) => "'" . str_replace("'", "''", $c) . "'", $warranty_colors);
+}
+$warranty_colors_list = implode(',', $warranty_colors_escaped);
+
+$delivery_where = "{$owner_filter}company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition') AND NOT (
+    LOWER(TRIM(COALESCE(company_name, ''))) IN ('andison manila', 'to andison manila')
+    OR LOWER(TRIM(COALESCE(transferred_to, ''))) IN ('andison manila', 'to andison manila')
+    OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila')
+) AND COALESCE(highlight_color, '') NOT IN ({$warranty_colors_list})";
 
 // Get statistics from database
 $stats = [
@@ -213,7 +221,7 @@ $delivery_records = [];
 $result = $conn->query("SELECT * FROM delivery_records WHERE $delivery_where$dataset_filter ORDER BY COALESCE(created_at, '1970-01-01 00:00:00') DESC, id ASC");
 if ($result) {
     while ($row = $result->fetch_assoc()) {
-        if (isLegendMarkerRow($row) || isWarrantyReplacementRow($row)) {
+        if (isLegendMarkerRow($row)) {
             continue;
         }
         $delivery_records[] = $row;
@@ -254,18 +262,9 @@ if ($itemResult) {
         
         // Skip if item_code is just a month name or only whitespace
         if (!in_array($code, $monthNames) && !empty($code) && !empty($name)) {
-            // Get available quantity from Stock Addition records
-            $qty_query = "SELECT COALESCE(SUM(quantity), 0) as qty FROM delivery_records WHERE item_code = '" . $conn->real_escape_string($code) . "' AND company_name = 'Stock Addition' AND owner_user_id = {$owner_user_id}";
-            $qty_result = $conn->query($qty_query);
-            $available_qty = 0;
-            if ($qty_result && $qty_row = $qty_result->fetch_assoc()) {
-                $available_qty = intval($qty_row['qty']);
-            }
-            
             $allItems[] = [
                 'code' => $code,
-                'name' => $name,
-                'available' => $available_qty
+                'name' => $name
             ];
         }
     }
@@ -292,18 +291,9 @@ if (empty($allItems)) {
             $name = trim($row['item_name']);
             
             if (!in_array($code, $monthNames) && !empty($code) && !empty($name)) {
-                // Get available quantity
-                $qty_query = "SELECT COALESCE(SUM(quantity), 0) as qty FROM delivery_records WHERE item_code = '" . $conn->real_escape_string($code) . "' AND company_name = 'Stock Addition' AND owner_user_id = {$owner_user_id}";
-                $qty_result = $conn->query($qty_query);
-                $available_qty = 0;
-                if ($qty_result && $qty_row = $qty_result->fetch_assoc()) {
-                    $available_qty = intval($qty_row['qty']);
-                }
-                
                 $allItems[] = [
                     'code' => $code,
-                    'name' => $name,
-                    'available' => $available_qty
+                    'name' => $name
                 ];
             }
         }
@@ -1260,23 +1250,6 @@ if (empty($allItems)) {
             color: #f5b041;
         }
 
-        .action-buttons .warranty-btn {
-            color: #27ae60;
-            text-decoration: none;
-            font-size: 13px;
-            padding: 8px 14px;
-            border-radius: 6px;
-            transition: all 0.2s ease;
-            background: rgba(39, 174, 96, 0.1);
-            white-space: nowrap;
-            font-weight: 600;
-        }
-
-        .action-buttons .warranty-btn:hover {
-            background: rgba(39, 174, 96, 0.25);
-            color: #2ecc71;
-        }
-
         /* Delete Confirmation Modal */
         .delete-modal {
             position: fixed;
@@ -1405,18 +1378,6 @@ if (empty($allItems)) {
         body.light-mode .action-buttons .edit-btn:hover {
             background: rgba(243, 156, 18, 0.15);
             color: #f39c12;
-        }
-
-        html.light-mode .action-buttons .warranty-btn,
-        body.light-mode .action-buttons .warranty-btn {
-            color: #188038;
-            background: rgba(39, 174, 96, 0.08);
-        }
-
-        html.light-mode .action-buttons .warranty-btn:hover,
-        body.light-mode .action-buttons .warranty-btn:hover {
-            background: rgba(39, 174, 96, 0.15);
-            color: #27ae60;
         }
 
         html.light-mode .delete-modal-content,
@@ -1692,7 +1653,7 @@ if (empty($allItems)) {
             <button class="btn-export" onclick="exportToExcel()">
                 <i class="fas fa-file-excel"></i> Export
             </button>
-            <?php if ($dataset_is_enabled && $canAddDelivery): ?>
+            <?php if ($dataset_is_enabled && isPermissionEnabled('delivery_add_records', $conn)): ?>
             <button class="btn-add-record" onclick="openAddModal()">
                 <i class="fas fa-plus"></i> Add Record
             </button>
@@ -1753,18 +1714,9 @@ if (empty($allItems)) {
                     </tr>
                     <?php else: ?>
                     <?php 
-                    // Filter out "stock in manila" items first
-                    $filtered_records = [];
-                    foreach ($delivery_records as $record) {
-                        $sold_to_check = strtolower(trim((string) ($record['sold_to'] ?? '')));
-                        if (strpos($sold_to_check, 'stock in manila') === false) {
-                            $filtered_records[] = $record;
-                        }
-                    }
-                    
                     // Group records by invoice_no to identify multi-item invoices
                     $invoice_groups = [];
-                    foreach ($filtered_records as $record) {
+                    foreach ($delivery_records as $record) {
                         $inv_no = (string)($record['invoice_no'] ?? '');
                         if (!isset($invoice_groups[$inv_no])) {
                             $invoice_groups[$inv_no] = [];
@@ -1784,15 +1736,8 @@ if (empty($allItems)) {
                     ?>
                     <tr class="invoice-group-header <?php echo $hidden_class; ?>" data-group-id="<?php echo htmlspecialchars($group_id); ?>" onclick="toggleInvoiceGroup('<?php echo htmlspecialchars($group_id); ?>')">
                         <td colspan="12" style="padding: 12px; background: linear-gradient(135deg, #1abc9c, #16a085); color: #ffffff; cursor: pointer; font-weight: 600; border-left: 4px solid #0f8b7b;">
-                            <?php 
-                                // Calculate total quantity for all items in this invoice
-                                $total_qty = 0;
-                                foreach ($items as $item) {
-                                    $total_qty += intval($item['quantity'] ?? 0);
-                                }
-                            ?>
                             <i class="fas fa-chevron-down group-toggle-icon" style="margin-right: 8px; transition: transform 0.3s; display: inline-block;"></i>
-                            <span style="font-size: 14px;">📦 Invoice: <strong><?php echo htmlspecialchars($invoice_no); ?></strong> - <span class="item-count"><?php echo count($items); ?></span> items - <strong style="color: #fff9e6;">Total Qty: <?php echo $total_qty; ?></strong></span>
+                            <span style="font-size: 14px;">📦 Invoice: <strong><?php echo htmlspecialchars($invoice_no); ?></strong> - <span class="item-count"><?php echo count($items); ?></span> items</span>
                         </td>
                     </tr>
                     <?php 
@@ -1801,12 +1746,6 @@ if (empty($allItems)) {
                         
                         // Render each item in the group
                         foreach ($items as $record): 
-                        // SAFETY CHECK: Skip "stock in manila" items (should not appear in delivery records)
-                        $sold_to_check = strtolower(trim((string) ($record['sold_to'] ?? '')));
-                        if (strpos($sold_to_check, 'stock in manila') !== false) {
-                            continue; // Skip this record
-                        }
-                        
                         $delivery_date = '';
                         if (!empty($record['delivery_date'])) {
                             $delivery_date = date('M j, Y', strtotime($record['delivery_date']));
@@ -1982,25 +1921,17 @@ if (empty($allItems)) {
                         <td<?php echo $cellStyleAttr('item_name'); ?>><?php echo htmlspecialchars($record['item_name'] ?? ''); ?></td>
                         <td<?php echo $cellStyleAttr('quantity'); ?>><?php echo (!empty($record['quantity']) && $record['quantity'] > 0) ? htmlspecialchars($record['quantity']) : ''; ?></td>
                         <td<?php echo $cellStyleAttr('uom'); ?>><?php echo htmlspecialchars($record['uom'] ?? ''); ?></td>
-                        <td<?php echo $cellStyleAttr('serial_no'); ?> style="font-weight: 600; letter-spacing: 0.5px;"><strong><?php echo !empty($record['serial_no']) ? htmlspecialchars($record['serial_no']) : '<span style="color: #888;">-</span>'; ?></strong></td>
+                        <td<?php echo $cellStyleAttr('serial_no'); ?>><?php echo htmlspecialchars($record['serial_no'] ?? ''); ?></td>
                         <td<?php echo $cellStyleAttr('sold_to'); ?>><?php echo htmlspecialchars($display_sold_to); ?></td>
                         <td<?php echo $cellStyleAttr('delivery_date'); ?>><?php echo htmlspecialchars($delivery_date); ?></td>
                         <td<?php echo $cellStyleAttr('notes'); ?>><?php echo htmlspecialchars($record['notes'] ?? ''); ?></td>
                         <td class="action-cell">
                             <div class="action-buttons">
                                 <a href="#" class="view-btn" onclick="openModal(event, <?php echo (int)($record['id'] ?? 0); ?>)"><i class="fas fa-eye"></i> View</a>
-                                <?php 
-                                    // Check if this is a warranty replacement record
-                                    $groupings_lower = strtolower(trim((string)($record['groupings'] ?? '')));
-                                    $is_warranty = (strpos($groupings_lower, 'warranty replacement') !== false || strpos($groupings_lower, '3a') !== false);
-                                ?>
-                                <?php if ($is_warranty): ?>
-                                <a href="#" class="warranty-btn" onclick="moveToWarranty(event, <?php echo (int)($record['id'] ?? 0); ?>, '<?php echo htmlspecialchars((string)($record['item_code'] ?? ''), ENT_QUOTES); ?>')"><i class="fas fa-check-circle"></i> To Warranty</a>
-                                <?php endif; ?>
-                                <?php if ($canEditDelivery): ?>
+                                <?php if (isPermissionEnabled('delivery_edit_records', $conn)): ?>
                                 <a href="#" class="edit-btn" onclick="openEditModal(event, <?php echo (int)($record['id'] ?? 0); ?>)"><i class="fas fa-edit"></i> Edit</a>
                                 <?php endif; ?>
-                                <?php if ($canDeleteDelivery): ?>
+                                <?php if (isPermissionEnabled('delivery_delete_records', $conn)): ?>
                                 <a href="#" class="delete-btn" onclick="deleteRecord(event, <?php echo (int)($record['id'] ?? 0); ?>, '<?php echo htmlspecialchars((string)($record['item_code'] ?? ''), ENT_QUOTES); ?>')"><i class="fas fa-trash"></i> Delete</a>
                                 <?php endif; ?>
                             </div>
@@ -2079,8 +2010,8 @@ if (empty($allItems)) {
                         <select id="add_item_code" name="item_code" required>
                             <option value="">-- Select Item --</option>
                             <?php foreach ($allItems as $item): ?>
-                                <option value="<?php echo htmlspecialchars($item['code']); ?>" data-name="<?php echo htmlspecialchars($item['name']); ?>" data-quantity="<?php echo intval($item['available'] ?? 0); ?>">
-                                    <?php echo htmlspecialchars($item['code']); ?> (Stock: <?php echo intval($item['available'] ?? 0); ?> units)
+                                <option value="<?php echo htmlspecialchars($item['code']); ?>" data-name="<?php echo htmlspecialchars($item['name']); ?>">
+                                    <?php echo htmlspecialchars($item['code']); ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -2901,102 +2832,6 @@ if (empty($allItems)) {
             }
         });
 
-        // Move to Warranty Functions
-        let warrantyMoveId = null;
-        let warrantyMoveRow = null;
-
-        function moveToWarranty(event, recordId, itemCode) {
-            event.preventDefault();
-            warrantyMoveId = recordId;
-            warrantyMoveRow = event.target.closest('tr');
-            
-            // Confirm move
-            if (confirm(`Move ${itemCode} to warranty items?`)) {
-                performWarrantyMove();
-            }
-        }
-
-        function performWarrantyMove() {
-            if (!warrantyMoveId) return;
-
-            showRecordsLoader('MOVING TO WARRANTY');
-
-            fetch('api/move-to-warranty.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ 
-                    delivery_record_id: warrantyMoveId,
-                    remove_from_delivery: true
-                })
-            })
-            .then(async response => {
-                const raw = await response.text();
-                let result = null;
-                try {
-                    result = JSON.parse(raw);
-                } catch (e) {
-                    result = null;
-                }
-
-                const bodySaysSuccess = /"success"\s*:\s*true/i.test(raw);
-                const isSuccess = Boolean(result && result.success) || bodySaysSuccess;
-                return {
-                    isSuccess,
-                    message: (result && result.message) ? result.message : 'Failed to move record',
-                    raw
-                };
-            })
-            .then(payload => {
-                hideRecordsLoader();
-
-                if (payload.isSuccess) {
-                    showToast('Record moved to warranty!', 'success');
-                    recordsData = recordsData.filter(r => parseInt(r.id, 10) !== parseInt(warrantyMoveId, 10));
-
-                    if (warrantyMoveRow) {
-                        warrantyMoveRow.style.transition = 'all 0.3s ease';
-                        warrantyMoveRow.style.opacity = '0';
-                        warrantyMoveRow.style.transform = 'translateX(-20px)';
-                        setTimeout(() => {
-                            warrantyMoveRow.remove();
-                            reindexRows();
-                            balanceVisibleRows();
-                            updateSummaryCards();
-                            ensureEmptyStateRow();
-                            updateVisibleCount();
-                            updateSearchCount();
-                            updateLoadMoreState();
-                        }, 300);
-                    } else {
-                        reindexRows();
-                        balanceVisibleRows();
-                        updateSummaryCards();
-                        ensureEmptyStateRow();
-                        updateVisibleCount();
-                        updateSearchCount();
-                        updateLoadMoreState();
-                    }
-
-                    warrantyMoveId = null;
-                    warrantyMoveRow = null;
-                    refreshCurrentPage(500);
-                } else {
-                    showToast('Error: ' + payload.message, 'error');
-                    warrantyMoveId = null;
-                    warrantyMoveRow = null;
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                hideRecordsLoader();
-                showToast('Error moving record to warranty. Please try again.', 'error');
-                warrantyMoveId = null;
-                warrantyMoveRow = null;
-            });
-        }
-
         // Add Record Modal Functions
         function openAddModal() {
             document.getElementById('addRecordModal').classList.add('show');
@@ -3065,21 +2900,6 @@ if (empty($allItems)) {
                 status: document.getElementById('add_status').value,
                 dataset_name: '<?php echo isset($selected_dataset) ? htmlspecialchars($selected_dataset) : "all"; ?>'
             };
-            
-            // Validate stock before sending - only if delivering to a customer
-            const hasDeliveryDestination = formData.company_name || formData.transferred_to || formData.sold_to;
-            if (hasDeliveryDestination && formData.quantity > 0) {
-                const selectedOption = document.getElementById('add_item_code').options[document.getElementById('add_item_code').selectedIndex];
-                const availableStock = parseInt(selectedOption.getAttribute('data-quantity') || 0);
-                
-                if (formData.quantity > availableStock) {
-                    hideRecordsLoader();
-                    submitBtn.innerHTML = originalText;
-                    submitBtn.disabled = false;
-                    showToast(`❌ Insufficient stock! Available: ${availableStock} units, Requested: ${formData.quantity} units`, 'error');
-                    return;
-                }
-            }
             
             // Send to API
             fetch('api/add-record.php', {
@@ -3841,15 +3661,10 @@ if (empty($allItems)) {
                 || selectedCategoryFilters.length === availableCategoryFilters.length;
             const hasSearch = query !== '';
 
-            let visibleCount = 0;
-
-            // Show/hide data rows based on filter
+            // Show/hide rows based on filter
             tableRows.forEach(row => {
-                // Skip empty state rows (ones with colspan)
+                // Skip rows with colspan (empty state)
                 if (row.querySelector('td[colspan]')) return;
-
-                // Skip invoice group headers for now, we'll process them after
-                if (row.classList.contains('invoice-group-header')) return;
 
                 let categoryMatched = false;
                 if (showAll) {
@@ -3868,50 +3683,18 @@ if (empty($allItems)) {
                     row.classList.remove('filtered-match');
                     row.classList.toggle('hidden-row', !shouldShowByPage);
                     row.style.display = shouldShowByPage ? 'table-row' : 'none';
-                    if (shouldShowByPage) visibleCount++;
                 } else {
                     // While searching/filtering by category, ignore pagination and show exact matches only.
                     row.classList.remove('hidden-row');
                     if (matched) {
                         row.classList.add('filtered-match');
                         row.style.display = 'table-row';
-                        visibleCount++;
                     } else {
                         row.classList.remove('filtered-match');
                         row.style.display = 'none';
                     }
                 }
             });
-
-            // Now handle invoice group headers - hide them if all their items are hidden
-            document.querySelectorAll('table tbody tr.invoice-group-header').forEach(headerRow => {
-                const groupId = headerRow.getAttribute('data-group-id');
-                const itemsInGroup = document.querySelectorAll(`table tbody tr.invoice-group-item[data-group-id="${groupId}"]`);
-                const hasVisibleItems = Array.from(itemsInGroup).some(item => item.style.display !== 'none');
-                
-                headerRow.style.display = hasVisibleItems ? 'table-row' : 'none';
-            });
-
-            // Show/hide empty state based on visible data rows
-            let emptyStateRow = document.querySelector('table tbody tr#noResultsRow');
-            if (!emptyStateRow) {
-                // Create empty state if it doesn't exist
-                const tbody = document.querySelector('table tbody');
-                if (tbody) {
-                    emptyStateRow = document.createElement('tr');
-                    emptyStateRow.id = 'noResultsRow';
-                    const td = document.createElement('td');
-                    td.colSpan = 12;
-                    td.style.cssText = 'text-align: center; padding: 40px; color: #a0a0a0;';
-                    td.innerHTML = '<i class="fas fa-search" style="font-size: 48px; margin-bottom: 15px; display: block;"></i>No records match your search.';
-                    emptyStateRow.appendChild(td);
-                    tbody.appendChild(emptyStateRow);
-                }
-            }
-
-            if (emptyStateRow) {
-                emptyStateRow.style.display = visibleCount === 0 ? 'table-row' : 'none';
-            }
 
             // Hide pagination controls while filtering
             if (loadMoreContainer) {
@@ -3955,7 +3738,6 @@ if (empty($allItems)) {
         let searchActive = false;
         
         function searchTable() {
-            // Just update the category filters which handles both search and category filtering
             applyCategoryFilters();
         }
 

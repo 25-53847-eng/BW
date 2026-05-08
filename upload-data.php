@@ -5,6 +5,17 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
+// ADMIN ONLY - Restrict upload to admin role
+if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'employee') {
+    header('Location: employee/index.php?error=upload_denied', true, 302);
+    exit;
+}
+
+// Set default role to admin if not set (for backwards compatibility)
+if (empty($_SESSION['user_role'])) {
+    $_SESSION['user_role'] = 'admin';
+}
+
 // Get total record count from database
 require_once 'db_config.php';
 $totalRecords = 0;
@@ -999,6 +1010,7 @@ if ($conn) {
                     <div class="modal-stat-label">Failed</div>
                 </div>
             </div>
+            <div id="modalErrors" style="display:none;"></div>
             <div class="modal-buttons">
                 <button class="btn-modal btn-modal-primary" onclick="goToDeliveryRecords(lastImportedDataset)">
                     <i class="fas fa-list"></i> View Records
@@ -2162,13 +2174,23 @@ if ($conn) {
                         return;
                     }
                     
-                    const result = JSON.parse(responseText);
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('❌ Failed to parse JSON response:', parseError);
+                        console.error('❌ Response was:', responseText.substring(0, 1000));
+                        showAlert('error', `Server Error: Invalid response from API. Status: ${response.status}. Response: ${responseText.substring(0, 200)}`);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected as Separate Datasets'; }
+                        return;
+                    }
+                    
                     if (result.success) {
                         totalImported += result.imported || rows.length;
                         totalFailed += result.failed || 0;
                         importedDatasets.push(datasetName);
                     } else {
-                        showAlert('error', `Error importing item ${i + 1}: ${result.message}`);
+                        showAlert('error', `Error importing item ${i + 1}: ${result.message || 'Unknown error'}`);
                         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected as Separate Datasets'; }
                         return;
                     }
@@ -2305,14 +2327,24 @@ if ($conn) {
                         return;
                     }
                     
-                    const result = JSON.parse(responseText);
+                    let result;
+                    try {
+                        result = JSON.parse(responseText);
+                    } catch (parseError) {
+                        console.error('❌ Failed to parse JSON response:', parseError);
+                        console.error('❌ Response was:', responseText.substring(0, 1000));
+                        showAlert('error', `Server Error: Invalid response from API. Status: ${response.status}. Response: ${responseText.substring(0, 200)}`);
+                        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected Sheets'; }
+                        return;
+                    }
+                    
                     if (result.success) {
                         totalImported += result.imported || rows.length;
                         totalFailed   += result.failed  || 0;
                         sheetsOk++;
                         importedDatasets.push(datasetName);
                     } else {
-                        showAlert('error', `Error importing "${sheetName}": ${result.message}`);
+                        showAlert('error', `Error importing "${sheetName}": ${result.message || 'Unknown error'}`);
                         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Import Selected Sheets'; }
                         return;
                     }
@@ -2687,8 +2719,13 @@ if ($conn) {
                     const actualDatasetName = result.dataset_name || datasetName;
                     console.log('✅ Import successful! Final dataset:', actualDatasetName);
                     
+                    // Log errors for debugging if present
+                    if (result.errors && result.errors.length > 0) {
+                        console.warn('⚠️ Import errors:', result.errors);
+                    }
+                    
                     // Show success popup modal with actual dataset name
-                    showSuccessModal(result.imported, result.failed || 0, fileNames, actualDatasetName);
+                    showSuccessModal(result.imported, result.failed || 0, fileNames, actualDatasetName, result.errors || []);
                     // Don't auto-reset - let user click 'View Records' or 'Import More'
                 } else {
                     showAlert('error', result.message || 'Import failed. Please try again.');
@@ -2754,13 +2791,36 @@ if ($conn) {
 
         let lastImportedDataset = null;
 
-        function showSuccessModal(imported, failed, fileName, datasetName) {
+        function showSuccessModal(imported, failed, fileName, datasetName, errors = []) {
             lastImportedDataset = datasetName || null;
             document.getElementById('modalImported').textContent = imported;
             document.getElementById('modalFailed').textContent = failed;
             const dsLabel = datasetName ? ` → saved as <strong style="color:#f4d03f">${datasetName.toUpperCase()}</strong>` : '';
             document.getElementById('modalMessage').innerHTML = 
                 `Successfully imported ${imported} records from "${fileName}"${dsLabel}`;
+            
+            // Show errors if present
+            const errorContainer = document.getElementById('modalErrors');
+            if (errorContainer && errors && errors.length > 0) {
+                const showCount = 15;
+                const errorItems = errors.slice(0, showCount).map(e => {
+                    const msg = e.substring(0, 120);
+                    return `<div style="background:rgba(255,100,100,0.08); border-left:3px solid #ff6b6b; padding:6px 10px; margin:4px 0; font-size:11px; color:#ff8a8a; border-radius:2px; font-family:monospace;">${msg}${e.length > 120 ? '...' : ''}</div>`;
+                }).join('');
+                
+                const moreCount = errors.length > showCount ? `<div style="color:#ffa94d; font-size:11px; margin-top:8px; padding:6px 10px; background:rgba(255,165,0,0.1); border-radius:2px;">+ ${errors.length - showCount} more error(s) - check browser console for full list</div>` : '';
+                
+                errorContainer.innerHTML = `<div style="margin-top:12px;"><div style="font-size:12px; color:#ff8a8a; font-weight:600; margin-bottom:8px;">⚠️ Import Issues:</div><div style="max-height:180px; overflow-y:auto; border:1px solid rgba(255,100,100,0.2); border-radius:4px; padding:6px;">${errorItems}${moreCount}</div></div>`;
+                errorContainer.style.display = 'block';
+                
+                // Log all errors to console for detailed review
+                console.group('🔴 Import Failed Records Details');
+                errors.forEach((err, idx) => console.error(`${idx + 1}. ${err}`));
+                console.groupEnd();
+            } else if (errorContainer) {
+                errorContainer.style.display = 'none';
+            }
+            
             document.getElementById('successModal').classList.add('show');
         }
 

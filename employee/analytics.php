@@ -89,14 +89,16 @@ if ($result) {
     }
 }
 
-// Top 15 companies by quantity
+// Top 15 companies by quantity - use sold_to (actual customers), not company_name (internal classification)
+// Exclude inventory items by filtering inventory_status
 $result = $conn->query("
-    SELECT company_name, 
+    SELECT sold_to as company_name, 
            COUNT(*) as order_count,
            COALESCE(SUM(quantity), 0) as total_qty
     FROM delivery_records 
-    WHERE company_name IS NOT NULL AND company_name != ''$dataset_filter
-    GROUP BY company_name 
+    WHERE sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != '' 
+      AND (inventory_status IS NULL OR inventory_status = '')$dataset_filter
+    GROUP BY sold_to 
     ORDER BY total_qty DESC 
     LIMIT 15
 ");

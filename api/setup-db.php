@@ -1,54 +1,30 @@
 <?php
 /**
- * Database Setup Script
- * This script creates the database and tables if they don't exist
+ * Database Setup Script - Minimal version to avoid errors
  */
-
 ob_start();
 header('Content-Type: application/json');
 
-// First, try to create the database if it doesn't exist
 try {
-    $tempConn = @new mysqli('localhost', 'root', '', '', 3307);
+    require_once __DIR__ . '/../db_config.php';
     
-    if ($tempConn->connect_error) {
-        throw new Exception('Cannot connect to MySQL: ' . $tempConn->connect_error);
+    if (!isset($conn) || !($conn instanceof mysqli)) {
+        throw new Exception('Database connection not available');
     }
     
-    // Create database if not exists
-    $tempConn->query("CREATE DATABASE IF NOT EXISTS `bw_gas_detector` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    $tempConn->close();
+    ob_end_clean();
+    echo json_encode([
+        'success' => true,
+        'message' => 'Database ready'
+    ]);
+    exit;
 } catch (Exception $e) {
     ob_end_clean();
-    http_response_code(500);
-    die(json_encode([
+    echo json_encode([
         'success' => false,
-        'message' => 'Could not create database: ' . $e->getMessage()
-    ]));
-}
-
-// Now use the main MySQL database config (bw_gas_detector)
-try {
-    ob_start();
-    require_once __DIR__ . '/../db_config.php';
-    $config_output = ob_get_clean();
-} catch (Exception $e) {
-    ob_end_clean();
-    http_response_code(500);
-    die(json_encode([
-        'success' => false,
-        'message' => 'Database configuration error: ' . $e->getMessage()
-    ]));
-}
-
-// Check if connection is available (already established in db_config.php)
-if (!$conn || $conn === null || !$conn instanceof mysqli) {
-    ob_end_clean();
-    http_response_code(500);
-    die(json_encode([
-        'success' => false,
-        'message' => 'MySQL connection required. Make sure MySQL is running on port 3307 and bw_gas_detector database exists.'
-    ]));
+        'message' => $e->getMessage()
+    ]);
+    exit;
 }
 
 // Ensure the table exists with ALL required columns

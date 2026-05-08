@@ -1,118 +1,84 @@
 <?php
-// Start output buffering FIRST, before anything else
+// Start output buffering FIRST to capture any errors
 ob_start();
-
-// Set up error logging IMMEDIATELY
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
-ini_set('log_errors', 1);
-
-// Create a logs directory if it doesn't exist
-$logsDir = __DIR__ . '/../logs';
-if (!is_dir($logsDir)) {
-    @mkdir($logsDir, 0755, true);
-}
-$logFile = $logsDir . '/import-api.log';
-ini_set('error_log', $logFile);
-
-// Custom error handler - log all errors/warnings to file, don't display
-set_error_handler(function($errno, $errstr, $errfile, $errline) {
-    $msg = date('Y-m-d H:i:s') . " [$errno] $errstr in $errfile:$errline";
-    error_log($msg);
-    // Don't call the default handler (don't display the error)
-    return true;
-}, E_ALL);
-
-// Avoid "session already active" errors
-if (session_status() === PHP_SESSION_NONE) {
-    @session_start();
-}
-
-// Set JSON header
-header('Content-Type: application/json; charset=utf-8');
+header('Content-Type: application/json');
 
 // Increase limits for large imports
 ini_set('memory_limit', '256M');
 ini_set('max_execution_time', 300);
 set_time_limit(300);
 
-// Set exception handler as fallback
-set_exception_handler(function($e) {
-    $msg = date('Y-m-d H:i:s') . " EXCEPTION: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine();
-    error_log($msg);
-    error_log("Trace: " . $e->getTraceAsString());
-    // Clean ALL output buffers
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
+// Error handler to ensure JSON response even on errors
+set_error_handler(function($errno, $errstr, $errfile, $errline) {
+    ob_clean();
     http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => false, 'message' => 'System error: ' . $e->getMessage()]);
+    echo json_encode([
+        'success' => false,
+        'message' => 'PHP Error: ' . $errstr,
+        'file' => basename($errfile),
+        'line' => $errline
+    ]);
     exit;
 });
 
-// Wrap database config to catch any output
-try {
-    ob_start(); // Buffer any output from db_config
-    require_once __DIR__ . '/../db_config.php';
-    $config_output = ob_get_clean(); // Get and discard any output
-    if (!empty($config_output)) {
-        error_log("Warning: db_config.php produced output: " . substr($config_output, 0, 200));
+// Shutdown handler to catch fatal errors
+register_shutdown_function(function() {
+    $error = error_get_last();
+    if ($error && ($error['type'] === E_ERROR || $error['type'] === E_PARSE || $error['type'] === E_COMPILE_ERROR)) {
+        ob_clean();
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Fatal Error: ' . $error['message'],
+            'file' => basename($error['file']),
+            'line' => $error['line']
+        ]);
     }
-} catch (Throwable $e) {
-    ob_end_clean();
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => false, 'message' => 'Database config error: ' . $e->getMessage()]);
+});
+
+session_start();
+
+// ADMIN ONLY - Check authentication and role
+if (empty($_SESSION['user_id'])) {
+    ob_clean();
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Not authenticated']);
     exit;
 }
 
-// Verify database connection was successful
-if ($conn === null || !$conn) {
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['success' => false, 'message' => 'Database connection failed. Make sure MySQL is running on port 3307 and bw_gas_detector database exists.']);
+if (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'employee') {
+    ob_clean();
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Access denied. Only admins can upload data.']);
     exit;
 }
+
+// Set default role to admin if not set (for backwards compatibility)
+if (empty($_SESSION['user_role'])) {
+    $_SESSION['user_role'] = 'admin';
+}
+
+require_once __DIR__ . '/../db_config.php';
 
 function respond(array $d, int $code = 200): never {
-    // Clean ALL output buffers to prevent HTML from leaking through
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    // Ensure JSON header is set
-    header('Content-Type: application/json; charset=utf-8');
+    ob_clean();
     http_response_code($code);
     echo json_encode($d);
     exit;
 }
 
 $json    = file_get_contents('php://input');
-
-// Validate JSON before parsing
-if (empty($json)) {
-    respond(['success' => false, 'message' => 'Empty request body'], 400);
-}
-
 $request = json_decode($json, true);
 
-// Check for JSON parse errors
-if ($request === null) {
-    $error = json_last_error_msg();
-    error_log("JSON Parse Error: " . $error . " | Raw input: " . substr($json, 0, 200));
-    respond(['success' => false, 'message' => 'Invalid JSON: ' . $error], 400);
-}
-
-if (!isset($request['data'])) {
-    respond(['success' => false, 'message' => 'Missing data field in request'], 400);
+if (!$request || !isset($request['data'])) {
+    respond(['success' => false, 'message' => 'Invalid request data'], 400);
 }
 
 $data = $request['data'];
-
-// Validate data is array
-if (!is_array($data)) {
-    respond(['success' => false, 'message' => 'Data must be an array'], 400);
-}
 
 // Get warranty rows list from request (optional, 0-based indices)
 $warranty_rows = isset($request['warranty_rows']) && is_array($request['warranty_rows']) ? $request['warranty_rows'] : [];
@@ -502,7 +468,6 @@ $column_mappings = [
     'Serial No' => 'serial_no',
     'SerialNo' => 'serial_no',
     'Serial_No' => 'serial_no',
-    'SERIAL NO' => 'serial_no',
     'serial_no' => 'serial_no',
     
     // Date variations
@@ -562,6 +527,11 @@ $column_mappings = [
     'SOLD TO COMPANIES' => 'sold_to',
     'Sold To Companies' => 'sold_to',
     
+    // INVENTORY routing marker (Stock in Manila or INVENTORY)
+    'INVENTORY' => 'inventory_marker',
+    'Inventory' => 'inventory_marker',
+    'inventory' => 'inventory_marker',
+    
     // Status variations
     'Status' => 'status',
     'STATUS' => 'status',
@@ -615,12 +585,19 @@ $column_mappings = [
     'Color' => 'groupings',
     'COLOR' => 'groupings',
     'color' => 'groupings',
-    'Type' => 'groupings',
-    'TYPE' => 'groupings',
-    'type' => 'groupings',
     'Classification' => 'groupings',
     'CLASSIFICATION' => 'groupings',
     'classification' => 'groupings',
+    
+    // Unit Type variations (1a, 1b, 2a, 2b, 3a, 4a)
+    'Unit Type' => 'unit_type',
+    'UNIT TYPE' => 'unit_type',
+    'unit_type' => 'unit_type',
+    'UnitType' => 'unit_type',
+    'Unit_Type' => 'unit_type',
+    'Model' => 'unit_type',
+    'MODEL' => 'unit_type',
+    'model' => 'unit_type',
 ];
 
 // Build lowercase version of mappings for case-insensitive lookup
@@ -676,29 +653,6 @@ try {
             $conn->query('ALTER TABLE delivery_records ADD COLUMN sold_to VARCHAR(255) DEFAULT NULL');
         }
     }
-    
-    // Ensure owner_user_id column exists for user-scoped data
-    if ($isMysql) {
-        $ownerCol = $conn->query("SHOW COLUMNS FROM delivery_records LIKE 'owner_user_id'");
-        if (!$ownerCol || $ownerCol->num_rows === 0) {
-            $conn->query("ALTER TABLE delivery_records ADD COLUMN owner_user_id INT(11) DEFAULT 0 AFTER id");
-        }
-    } else {
-        $hasOwnerUserId = false;
-        $chkOwnerUserId = $conn->query('PRAGMA table_info(delivery_records)');
-        if ($chkOwnerUserId) {
-            while ($r = $chkOwnerUserId->fetch_assoc()) {
-                if (strtolower($r['name']) === 'owner_user_id') { $hasOwnerUserId = true; break; }
-            }
-        }
-        if (!$hasOwnerUserId) {
-            $conn->query('ALTER TABLE delivery_records ADD COLUMN owner_user_id INTEGER DEFAULT 0');
-        }
-    }
-    
-    // Get the owner user_id from session
-    $owner_user_id = intval($_SESSION['user_id'] ?? 0);
-    
     // Get dataset_name from request (e.g. data1, data2)
     $dataset_name = isset($request['dataset_name']) ? trim(strval($request['dataset_name'])) : '';
     if (empty($dataset_name)) $dataset_name = 'data1';
@@ -856,6 +810,15 @@ try {
             $invoice_no = isset($mapped['invoice_no']) ? trim(strval($mapped['invoice_no'])) : '';
             $item_code = isset($mapped['item_code']) ? trim(strval($mapped['item_code'])) : '';
             $item_name = isset($mapped['item_name']) ? trim(strval($mapped['item_name'])) : '';
+            
+            // Provide defaults for required fields
+            if (empty($item_code)) {
+                $item_code = 'UNKNOWN-' . uniqid(); // Generate unique code if missing
+            }
+            if (empty($item_name)) {
+                $item_name = $item_code; // Use item_code as name if missing
+            }
+            
             $quantity = isset($mapped['quantity']) ? intval($mapped['quantity']) : 0;
             $serial_no = isset($mapped['serial_no']) ? trim(strval($mapped['serial_no'])) : '';
             $notes = isset($mapped['notes']) ? trim(strval($mapped['notes'])) : '';
@@ -863,6 +826,46 @@ try {
             $sold_to = isset($mapped['sold_to']) ? trim(strval($mapped['sold_to'])) : '';
             $status = isset($mapped['status']) ? trim(strval($mapped['status'])) : 'Delivered';
             $uom = isset($mapped['uom']) ? trim(strval($mapped['uom'])) : '';
+            $unit_type = isset($mapped['unit_type']) ? strtolower(trim(strval($mapped['unit_type']))) : '';
+            
+            // AUTO-ROUTING LOGIC: Route items based on 'sold_to' field OR 'inventory_marker' column
+            // If sold_to is empty, check INVENTORY column for routing marker
+            // If INVENTORY = "Stock in Manila" → Route to Andison Manila
+            // Otherwise → Route to Stock Addition (inventory)
+            $inventory_marker = isset($mapped['inventory_marker']) ? trim(strval($mapped['inventory_marker'])) : '';
+            
+            if (empty($sold_to) || $sold_to == '-') {
+                // No sold_to value → Check INVENTORY column for routing marker
+                if (!empty($inventory_marker)) {
+                    $marker_lower = strtolower(trim($inventory_marker));
+                    // Check if INVENTORY column indicates Andison Manila
+                    if (strpos($marker_lower, 'stock in manila') !== false || 
+                        strpos($marker_lower, 'andison') !== false ||
+                        strpos($marker_lower, 'andiso') !== false) {
+                        $company_name = 'to Andison Manila';
+                        $sold_to = $inventory_marker; // Store the routing marker
+                    } else {
+                        // INVENTORY column doesn't indicate Andison Manila → Stock Addition
+                        $company_name = 'Stock Addition';
+                        $sold_to = $inventory_marker; // Store the marker (usually "INVENTORY")
+                    }
+                } else {
+                    // No marker → Default to Stock Addition
+                    $company_name = 'Stock Addition';
+                    $sold_to = '';
+                }
+            } else {
+                $sold_to_lower = strtolower(trim($sold_to));
+                // Check if sold_to contains Andison Manila or Stock in Manila variations
+                // ONLY route to Andison Manila if sold_to explicitly mentions 'andison' or 'stock in manila'
+                // Do NOT route just because it contains 'manila' (other companies like Kunimori Engineering Works-Manila should not route here)
+                if (strpos($sold_to_lower, 'andison') !== false || strpos($sold_to_lower, 'andiso') !== false || 
+                    strpos($sold_to_lower, 'stock in manila') !== false) {
+                    // Route to Andison Manila
+                    $company_name = 'to Andison Manila';
+                    // Keep sold_to as-is so we can see the original designation
+                }
+            }
             // Year starts at 0; will be filled from explicit YEAR column, delivery_date, or current year
             $year = isset($mapped['year']) ? intval($mapped['year']) : 0;
             
@@ -902,6 +905,14 @@ try {
                     if ($delivery_day == 0)       $delivery_day   = getDayFromDate($delivery_date);
                     if ($year <= 0)               $year           = intval(date('Y', strtotime($delivery_date)));
                 }
+            }
+            
+            // FALLBACK: If delivery_month/day still empty, use current date
+            if (empty($delivery_month) || $delivery_day == 0) {
+                $today = new DateTime();
+                if (empty($delivery_month))     $delivery_month = getMonthFromDate($today->format('Y-m-d'));
+                if ($delivery_day == 0)         $delivery_day   = intval($today->format('d'));
+                if ($year <= 0)                 $year           = intval($today->format('Y'));
             }
             
             // DO NOT auto-build delivery_date from component fields if it was blank in source
@@ -954,13 +965,6 @@ try {
 
             if (isset($mapped['cell_styles'])) {
                 $rawCellStyles = $mapped['cell_styles'];
-                
-                // If cell_styles came as a JSON string, decode it
-                if (is_string($rawCellStyles)) {
-                    $decoded = @json_decode($rawCellStyles, true);
-                    $rawCellStyles = is_array($decoded) ? $decoded : null;
-                }
-                
                 if (is_array($rawCellStyles)) {
                     $mappedCellStyles = [];
                     foreach ($rawCellStyles as $sourceField => $colorValue) {
@@ -1106,179 +1110,165 @@ try {
                 $status = 'Delivered';
             }
             
-            // AUTO-ROUTING LOGIC: Route items based on 'sold_to' field
-            // If sold_to is empty, route to Stock Addition (inventory)
-            // If sold_to contains Andison Manila or Stock in Manila variations, route to Andison Manila
-            // Otherwise use the provided company_name
-            if (empty($sold_to) || $sold_to == '-') {
-                // No sold_to value → Goes to Stock Addition (Inventory)
-                $company_name = 'Stock Addition';
-                $sold_to = '';
-            } else {
-                $sold_to_lower = strtolower(trim($sold_to));
-                // Check if sold_to contains Andison Manila or Stock in Manila variations
-                // ONLY route to Andison Manila if sold_to explicitly mentions 'andison' or 'stock in manila'
-                // Do NOT route just because it contains 'manila' (other companies like Kunimori Engineering Works-Manila should not route here)
-                if (strpos($sold_to_lower, 'andison') !== false || strpos($sold_to_lower, 'andiso') !== false || 
-                    strpos($sold_to_lower, 'stock in manila') !== false) {
-                    $company_name = 'to Andison Manila';
-                    // Keep the original sold_to value for reference
-                }
-                // Otherwise keep the provided company_name (might be a client name)
-            }
-            
             // Don't set default delivery month/day - only store what's in the Excel
             // Don't auto-fill quantity - if Excel has no quantity, leave it as 0/empty
 
-            // Insert into database
-            $sql = "INSERT INTO delivery_records 
-                    (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name, owner_user_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            // Check if this row is marked as warranty (red text detected)
+            $is_warranty_row = isset($warranty_rows_flipped[$index]);
             
-            $stmt = $conn->prepare($sql);
-            if (!$stmt) {
-                throw new Exception("Prepare failed: " . ($conn->error ?? 'Unknown error'));
-            }
-
-            // Types: s=invoice_no, s=serial_no, s=delivery_month, i=delivery_day,
-            //        i=delivery_year, s=record_date, s=delivery_date, s=item_code, s=item_name,
-            //        s=company_name, s=sold_to, i=quantity, s=status, s=highlight_color, s=cell_styles, s=notes, s=uom,
-            //        s=sold_to_month, i=sold_to_day, s=groupings, s=dataset_name, i=owner_user_id
-            $stmt->bind_param(
-                'sssiissssssissssssissi',
-                $invoice_no,
-                $serial_no,
-                $delivery_month,
-                $delivery_day,
-                $year,
-                $record_date,
-                $delivery_date,
-                $item_code,
-                $item_name,
-                $company_name,
-                $sold_to,
-                $quantity,
-                $status,
-                $highlight_color,
-                $cell_styles,
-                $notes,
-                $uom,
-                $sold_to_month,
-                $sold_to_day,
-                $groupings,
-                $dataset_name,
-                $owner_user_id
-            );
-
-            if (!$stmt->execute()) {
-                $errors[] = "Row " . ($index + 2) . ": " . $stmt->error;
-                $failed_count++;
-            } else {
-                $imported_count++;
-                
-                // Get the last inserted ID
-                $last_id = 0;
-                if ($isMysql) {
-                    $last_id = $conn->insert_id;
-                } else {
-                    // SQLite
-                    $res = $conn->query("SELECT last_insert_rowid() as id");
-                    if ($res) {
-                        $row = $res->fetch_assoc();
-                        $last_id = intval($row['id']);
-                    }
-                }
-                
-                // Handle warranty records - check if this row index is in warranty_rows
-                if ($last_id > 0 && isset($warranty_rows_flipped[$index])) {
-                    // This row is marked as warranty, insert into warranty_replacements table
-                    $warranty_date = date('Y-m-d'); // Today's date
-                    $status_warranty = 'Warranty Pending'; // Set warranty-specific status
-                    
-                    $warranty_sql = "INSERT INTO warranty_replacements 
-                        (delivery_record_id, invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, 
-                         item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, 
-                         dataset_name, warranty_flag, warranty_date, red_text_detected)
+            if (!$is_warranty_row) {
+                // SKIP warranty rows from delivery_records - they go directly to warranty_replacements
+                // Insert into database
+                $sql = "INSERT INTO delivery_records 
+                        (invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, item_code, item_name, unit_type, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, sold_to_month, sold_to_day, groupings, dataset_name)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                
+                $stmt = $conn->prepare($sql);
+                if (!$stmt) {
+                    throw new Exception("Prepare failed: " . ($conn->error ?? 'Unknown error'));
+                }
+
+                // Types: s=invoice_no, s=serial_no, s=delivery_month, i=delivery_day,
+                //        i=delivery_year, s=record_date, s=delivery_date, s=item_code, s=item_name, s=unit_type,
+                //        s=company_name, s=sold_to, i=quantity, s=status, s=highlight_color, s=cell_styles, s=notes, s=uom,
+                //        s=sold_to_month, i=sold_to_day, s=groupings, s=dataset_name
+                $stmt->bind_param(
+                    'sssiissssssissssssisss',
+                    $invoice_no,
+                    $serial_no,
+                    $delivery_month,
+                    $delivery_day,
+                    $year,
+                    $record_date,
+                    $delivery_date,
+                    $item_code,
+                    $item_name,
+                    $unit_type,
+                    $company_name,
+                    $sold_to,
+                    $quantity,
+                    $status,
+                    $highlight_color,
+                    $cell_styles,
+                    $notes,
+                    $uom,
+                    $sold_to_month,
+                    $sold_to_day,
+                    $groupings,
+                    $dataset_name
+                );
+
+                if (!$stmt->execute()) {
+                    $errorMsg = "Row " . ($index + 2) . ": " . $stmt->error . " [Code:" . $item_code . ", Name:" . substr($item_name, 0, 30) . ", Month:" . $delivery_month . ", Day:" . $delivery_day . "]";
+                    $errors[] = $errorMsg;
+                    error_log("IMPORT FAIL: " . $errorMsg);
+                    $failed_count++;
+                } else {
+                    $imported_count++;
                     
-                    $warranty_stmt = $conn->prepare($warranty_sql);
-                    if ($warranty_stmt) {
-                        $warranty_stmt->bind_param(
-                            'issiiissssssissssssisi',
-                            $last_id,
-                            $invoice_no,
-                            $serial_no,
-                            $delivery_month,
-                            $delivery_day,
-                            $year,
-                            $record_date,
-                            $delivery_date,
-                            $item_code,
-                            $item_name,
-                            $company_name,
-                            $sold_to,
-                            $quantity,
-                            $status_warranty,
-                            $highlight_color,
-                            $cell_styles,
-                            $notes,
-                            $uom,
-                            $dataset_name,
-                            $warranty_flag,
-                            $warranty_date,
-                            $red_text_detected
-                        );
-                        
-                        // Initialize warranty flag variables if not set
-                        if (!isset($warranty_flag)) $warranty_flag = 1;
-                        if (!isset($red_text_detected)) $red_text_detected = 1;
-                        
-                        if (!$warranty_stmt->execute()) {
-                            $errors[] = "Row " . ($index + 2) . ": warranty insert failed: " . $warranty_stmt->error;
-                        } else {
-                            $warranty_inserted_count++;
-                        }
-                        $warranty_stmt->close();
+                    // Get the last inserted ID for unmapped column updates
+                    $last_id = 0;
+                    if ($isMysql) {
+                        $last_id = $conn->insert_id;
                     } else {
-                        $errors[] = "Row " . ($index + 2) . ": warranty prepare failed: " . ($conn->error ?? 'unknown error');
+                        // SQLite
+                        $res = $conn->query("SELECT last_insert_rowid() as id");
+                        if ($res) {
+                            $row = $res->fetch_assoc();
+                            $last_id = intval($row['id']);
+                        }
+                    }
+                    
+                    // Insert unmapped column data
+                    if ($last_id > 0) {
+                        foreach ($record as $col => $value) {
+                            $col_lower = strtolower(trim($col));
+                            
+                            // Skip if this column is mapped
+                            if (isset($lower_mappings[$col_lower])) {
+                                continue;
+                            }
+                            
+                            // Create safe column name
+                            $safe_col_name = strtolower(trim($col));
+                            $safe_col_name = preg_replace('/[^a-z0-9_]/', '_', $safe_col_name);
+                            $safe_col_name = preg_replace('/_+/', '_', $safe_col_name);
+                            $safe_col_name = trim($safe_col_name, '_');
+                            
+                            // Update with unmapped column value
+                            if (!empty($safe_col_name) && !empty($value)) {
+                                if ($isMysql) {
+                                    $update_sql = "UPDATE delivery_records SET `{$safe_col_name}` = ? WHERE id = ?";
+                                } else {
+                                    $update_sql = "UPDATE delivery_records SET [{$safe_col_name}] = ? WHERE id = ?";
+                                }
+                                $update_stmt = $conn->prepare($update_sql);
+                                if ($update_stmt) {
+                                    $update_stmt->bind_param('si', $value, $last_id);
+                                    $update_stmt->execute();
+                                    $update_stmt->close();
+                                }
+                            }
+                        }
                     }
                 }
                 
-                // Insert unmapped column data
-                if ($last_id > 0) {
-                    foreach ($record as $col => $value) {
-                        $col_lower = strtolower(trim($col));
-                        
-                        // Skip if this column is mapped
-                        if (isset($lower_mappings[$col_lower])) {
-                            continue;
-                        }
-                        
-                        // Create safe column name
-                        $safe_col_name = strtolower(trim($col));
-                        $safe_col_name = preg_replace('/[^a-z0-9_]/', '_', $safe_col_name);
-                        $safe_col_name = preg_replace('/_+/', '_', $safe_col_name);
-                        $safe_col_name = trim($safe_col_name, '_');
-                        
-                        // Update with unmapped column value
-                        if (!empty($safe_col_name) && !empty($value)) {
-                            if ($isMysql) {
-                                $update_sql = "UPDATE delivery_records SET `{$safe_col_name}` = ? WHERE id = ?";
-                            } else {
-                                $update_sql = "UPDATE delivery_records SET [{$safe_col_name}] = ? WHERE id = ?";
-                            }
-                            $update_stmt = $conn->prepare($update_sql);
-                            if ($update_stmt) {
-                                $update_stmt->bind_param('si', $value, $last_id);
-                                $update_stmt->execute();
-                                $update_stmt->close();
-                            }
-                        }
+                $stmt->close();
+            } else {
+                // This is a warranty row (red text detected) - insert directly into warranty_replacements ONLY
+                $warranty_date = date('Y-m-d');
+                $status_warranty = 'Warranty Pending';
+                $warranty_flag = 1;
+                $red_text_detected = 1;
+                $last_id = null; // Use NULL instead of 0 to satisfy foreign key constraint
+                
+                $warranty_sql = "INSERT INTO warranty_replacements 
+                    (delivery_record_id, invoice_no, serial_no, delivery_month, delivery_day, delivery_year, record_date, delivery_date, 
+                     item_code, item_name, company_name, sold_to, quantity, status, highlight_color, cell_styles, notes, uom, 
+                     dataset_name, warranty_flag, warranty_date, red_text_detected)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                
+                $warranty_stmt = $conn->prepare($warranty_sql);
+                if ($warranty_stmt) {
+                    $warranty_stmt->bind_param(
+                        'issiiissssssissssssssi',
+                        $last_id,
+                        $invoice_no,
+                        $serial_no,
+                        $delivery_month,
+                        $delivery_day,
+                        $year,
+                        $record_date,
+                        $delivery_date,
+                        $item_code,
+                        $item_name,
+                        $company_name,
+                        $sold_to,
+                        $quantity,
+                        $status_warranty,
+                        $highlight_color,
+                        $cell_styles,
+                        $notes,
+                        $uom,
+                        $dataset_name,
+                        $warranty_flag,
+                        $warranty_date,
+                        $red_text_detected
+                    );
+                    
+                    if (!$warranty_stmt->execute()) {
+                        $errors[] = "Row " . ($index + 2) . " (warranty): " . $warranty_stmt->error;
+                        $failed_count++;
+                    } else {
+                        $warranty_inserted_count++;
+                        $imported_count++;
                     }
+                    $warranty_stmt->close();
+                } else {
+                    $errors[] = "Row " . ($index + 2) . " (warranty): prepare failed: " . ($conn->error ?? 'unknown error');
+                    $failed_count++;
                 }
             }
-            
-            $stmt->close();
 
         } catch (Exception $e) {
             $errors[] = "Row " . ($index + 2) . ": " . $e->getMessage();
@@ -1310,20 +1300,27 @@ try {
         'warranty_rows_received' => count($warranty_rows),
         'warranty_inserted' => $warranty_inserted_count,
         'total'    => count($data),
-        'message'  => "Successfully imported $imported_count records"
+        'message'  => "Successfully imported $imported_count records. Failed: $failed_count, Skipped: $skipped_count"
     ];
-    if (!empty($errors))   $response['errors']       = array_slice($errors,  0, 20);
-    if (!empty($skipped))  $response['skipped_rows'] = array_slice($skipped, 0, 20);
+    // Show all errors and skipped rows (not just first 20) to help diagnose import issues
+    if (!empty($errors))   $response['errors']       = $errors;
+    if (!empty($skipped))  $response['skipped_rows'] = $skipped;
+    // But also show count summaries
+    $response['error_count'] = count($errors);
+    $response['skipped_count'] = count($skipped);
+    // Show first error as sample for user feedback
+    if (!empty($errors)) {
+        $response['first_error_sample'] = $errors[0];
+    }
     respond($response);
 
-} catch (Throwable $e) {
+} catch (Exception $e) {
     if (isset($conn)) {
         try {
             if ($conn instanceof mysqli) $conn->rollback();
             else $conn->query('ROLLBACK');
         } catch (Throwable $_) {}
     }
-    error_log("Import API Error: " . $e->getMessage());
     respond(['success' => false, 'message' => 'Import error: ' . $e->getMessage()], 500);
 }
 ?>

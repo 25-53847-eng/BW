@@ -75,8 +75,8 @@ function bindParamsAndExecute(&$stmt, $params) {
     $stmt->execute();
 }
 
-// Count total delivered
-$sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE status = 'Delivered'" . $dataset_filter;
+// Count total delivered (ONLY 1A, 2A, 4A units)
+$sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE status = 'Delivered' AND unit_type IN ('1a', '2a', '4a')" . $dataset_filter;
 $stmt = $conn->prepare($sql);
 if ($stmt) {
     bindParamsAndExecute($stmt, $dataset_filter_params);
@@ -136,16 +136,18 @@ if ($stats['total_delivered'] > 0) {
     $stats['monthly_average'] = round($stats['total_delivered'] / 12);
 }
 
-// Calculate yearly total
-$stats['yearly_total'] = $stats['total_delivered'] + $stats['total_sold'];
+// Calculate yearly total (units only)
+$stats['yearly_total'] = $stats['total_delivered'];
 
-// Get top clients
+// Get top clients - use sold_to (actual customers), not company_name (internal classification)
+// Exclude inventory items by filtering inventory_status
 $top_clients = [];
 $sql = "
-    SELECT company_name, COUNT(*) as delivery_count, SUM(quantity) as total_quantity
+    SELECT sold_to as company_name, COUNT(*) as delivery_count, SUM(quantity) as total_quantity
     FROM delivery_records
-    WHERE 1=1" . $dataset_filter . "
-    GROUP BY company_name
+    WHERE sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != '' 
+      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter . "
+    GROUP BY sold_to
     ORDER BY total_quantity DESC
     LIMIT 15
 ";
@@ -180,12 +182,12 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Get top products by item code
+// Get top products by item code (ONLY 1A, 2A, 4A units)
 $top_products = [];
 $sql = "
     SELECT item_code, item_name, SUM(quantity) as total 
     FROM delivery_records
-    WHERE item_code IS NOT NULL AND item_code != '' AND item_code != '-'" . $dataset_filter . "
+    WHERE item_code IS NOT NULL AND item_code != '' AND item_code != '-' AND unit_type IN ('1a', '2a', '4a')" . $dataset_filter . "
     GROUP BY item_code 
     ORDER BY total DESC 
     LIMIT 10
@@ -437,7 +439,7 @@ if ($worst_month && $worst_month != $best_month) {
 $monthly_avg_insights[] = "Active months with deliveries: <strong>{$months_with_data}</strong>";
 
 $yearly_insights = [];
-$yearly_insights[] = "<strong>" . number_format($stats['yearly_total']) . "</strong> total combined (deliveries + sales)";
+$yearly_insights[] = "<strong>" . number_format($stats['yearly_total']) . "</strong> total units (1A, 2A, 4A) delivered across all transactions";
 $yearly_insights[] = "Total Delivered: <strong>" . number_format($stats['total_delivered']) . "</strong> units";
 $yearly_insights[] = "Total Sold: <strong>" . number_format($stats['total_sold']) . "</strong> transactions";
 if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
@@ -693,7 +695,7 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
                 <div class="summary-info">
                     <span class="summary-label">Yearly Total</span>
                     <span class="summary-value"><?php echo $stats['yearly_total']; ?></span>
-                    <span class="summary-subtitle">Total deliveries + sales</span>
+                    <span class="summary-subtitle">Total units (1A, 2A, 4A)</span>
                 </div>
                 <button class="insight-toggle" title="View Insights"><i class="fas fa-lightbulb"></i></button>
                 <div class="metric-insight-popup">
@@ -885,7 +887,12 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
             <!-- Monthly Comparison Card -->
             <div class="kpi-card">
                 <div class="card-header">
-                    <h3>Monthly Comparison</h3>
+                    <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                        <h3 style="margin: 0;">Monthly Comparison</h3>
+                        <select id="yearFilter" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; background: #f5f5f5; font-size: 13px; font-weight: 500; cursor: pointer; transition: border-color 0.2s;" onchange="handleYearChange(this.value)">
+                            <option value="">Loading years...</option>
+                        </select>
+                    </div>
                     <span class="card-icon"><i class="fas fa-balance-scale"></i></span>
                 </div>
                 <div class="card-content">
@@ -930,7 +937,12 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
             <!-- Monthly Sales Trend -->
             <div class="dashboard-panel">
                 <div class="panel-header">
-                    <h3>Monthly Sales Trend</h3>
+                    <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                        <h3 style="margin: 0;">Monthly Sales Trend</h3>
+                        <select id="trendYearFilter" style="padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; background: #f5f5f5; font-size: 13px; font-weight: 500; cursor: pointer; transition: border-color 0.2s;" onchange="handleTrendYearChange(this.value)">
+                            <option value="">Loading years...</option>
+                        </select>
+                    </div>
                     <button class="panel-menu-btn" aria-label="Panel menu">
                         <i class="fas fa-ellipsis-v"></i>
                     </button>
@@ -1071,6 +1083,61 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
             const loader = document.getElementById('pageLoader');
             if (loader) loader.remove();
         }, 4000);
+
+        // ============================================
+        // HANDLE TREND YEAR CHANGE (called from dropdown)
+        // ============================================
+        async function handleTrendYearChange(year) {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentDataset = urlParams.get('dataset') || '';
+                
+                // If year is empty (All Years), aggregate data from all years
+                // If year has a value, get data for that specific year
+                let url = 'api/get-trend-years.php';
+                if (year) {
+                    url += '?year=' + year;
+                } else {
+                    // Empty year means "All Years" - fetch aggregated data for all years
+                    // We use year=0 as a special parameter that the API handles
+                    url += '?year=0';
+                }
+                
+                if (currentDataset) {
+                    url += currentDataset ? '&dataset=' : '?dataset=';
+                    url += encodeURIComponent(currentDataset);
+                }
+                
+                console.log('Fetching trend data from:', url);
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success && data.monthly_sales) {
+                    // Update dashboardData with new monthly sales data
+                    dashboardData.monthly_sales = data.monthly_sales;
+                    dashboardData.current_trend_year = year || 'all';
+                    
+                    console.log('Updated trend data for year:', year || 'all years', data.monthly_sales);
+                    
+                    // Reinitialize the trend chart
+                    const ctx = document.getElementById('trendChart');
+                    if (ctx && Chart) {
+                        const existingChart = Chart.getChart(ctx);
+                        if (existingChart) {
+                            existingChart.destroy();
+                        }
+                        // Call the chart initialization function from app.js
+                        if (typeof initializeTrendChart === 'function') {
+                            initializeTrendChart();
+                        }
+                    }
+                } else {
+                    console.error('API error:', data);
+                }
+            } catch (e) {
+                console.error('Error fetching trend year data:', e);
+            }
+        }
     </script>
     <script src="js/app.js" defer></script>
 

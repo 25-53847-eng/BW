@@ -520,11 +520,6 @@
         "delivered": "18"
     },
     {
-        "code": "SR-TOX-MC-DUM",
-        "name": "Dummy Sensor for Toxic Sensor",
-        "delivered": "25"
-    },
-    {
         "code": "SR-W-MP75C",
         "name": "Replacement LEL Sensor",
         "delivered": "48"

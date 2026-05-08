@@ -341,26 +341,54 @@ document.addEventListener('DOMContentLoaded', function() {
     // Apply display settings
     initializeDisplaySettings();
     
-    // Initialize UI Elements
-    initializeDarkModeToggle();
-    initializeSidebarToggle();
-    initializeSubmenuToggle();
-    initializeProfileDropdown();
-    initializeNotificationDropdown();
-    initializeLogoutLoader();
-    initializeResponsive();
-    loadUserProfile();
+    // Initialize UI Elements (wrap in try-catch so errors don't break charts)
+    try {
+        initializeDarkModeToggle();
+        initializeSidebarToggle();
+        initializeSubmenuToggle();
+        initializeProfileDropdown();
+        // initializeNotificationDropdown(); // Skip - notification elements don't exist on this page
+        initializeLogoutLoader();
+        initializeResponsive();
+        loadUserProfile();
+    } catch(uiError) {
+        console.warn('UI initialization error (non-critical):', uiError);
+        // Continue anyway - charts are more important
+    }
     
-    // Initialize All Charts
-    initializeCharts();
+    // Initialize All Charts (MUST RUN - this is critical)
+    try {
+        initializeCharts();
+    } catch(chartError) {
+        console.error('Chart initialization failed:', chartError);
+    }
     
-    // Initialize Dataset Synchronization
-    initializeDatasetSync();
+    // Initialize Dataset Synchronization (try but don't block)
+    try {
+        initializeDatasetSync();
+    } catch(syncError) {
+        console.warn('Dataset sync error:', syncError);
+    }
 });
 
 window.addEventListener('load', syncNavbarOffset);
 window.addEventListener('resize', syncNavbarOffset);
 window.addEventListener('orientationchange', syncNavbarOffset);
+
+// Stop auto-refresh when user leaves the page
+window.addEventListener('beforeunload', function() {
+    stopTrendChartAutoRefresh();
+});
+
+// Stop auto-refresh when page becomes hidden (tab switch, etc)
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        stopTrendChartAutoRefresh();
+    } else {
+        // Resume auto-refresh when user returns
+        startTrendChartAutoRefresh();
+    }
+});
 
 // ============================================
 // DISPLAY SETTINGS
@@ -558,26 +586,27 @@ function initializeProfileDropdown() {
 // ============================================
 
 function initializeNotificationDropdown() {
-    const notificationBtn = document.getElementById('notificationBtn');
-    const notificationDropdown = document.getElementById('notificationDropdown');
-    const profileMenu = document.getElementById('profileMenu');
+    try {
+        const notificationBtn = document.getElementById('notificationBtn');
+        const notificationDropdown = document.getElementById('notificationDropdown');
+        const profileMenu = document.getElementById('profileMenu');
 
-    if (!notificationBtn || !notificationDropdown) {
-        console.warn('Notification button or dropdown not found in DOM');
-        return;
-    }
-
-    // Click handler for notification bell
-    notificationBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Close profile dropdown if open
-        if (profileMenu) {
-            profileMenu.classList.remove('active');
+        // Silently skip if notification elements don't exist
+        if (!notificationBtn || !notificationDropdown) {
+            return;
         }
-        
-        notificationDropdown.classList.toggle('show');
+
+        // Click handler for notification bell
+        notificationBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Close profile dropdown if open
+            if (profileMenu) {
+                profileMenu.classList.remove('active');
+            }
+            
+            notificationDropdown.classList.toggle('show');
     });
 
     // Click anywhere else to close dropdown
@@ -593,6 +622,9 @@ function initializeNotificationDropdown() {
             notificationDropdown.classList.remove('show');
         }
     });
+    } catch(err) {
+        // Silently ignore any notification dropdown errors - they shouldn't block the app
+    }
 }
 
 // ============================================
@@ -755,10 +787,238 @@ function updateProfileDisplay(firstName, lastName, email) {
 }
 
 // ============================================
-// CHART INITIALIZATION
+// YEAR FILTER FOR MONTHLY COMPARISON CHART
 // ============================================
 
+let monthlyComparisonChartInstance = null;
+let currentSelectedYear = new Date().getFullYear();
+
+async function loadAvailableYears() {
+    try {
+        const yearSelect = document.getElementById('yearFilter');
+        if (!yearSelect) {
+            console.warn('Year filter dropdown not found');
+            return;
+        }
+        
+        yearSelect.innerHTML = '<option>Loading years...</option>';
+        
+        // Get dataset from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataset = urlParams.get('dataset') || '';
+        console.log('Loading years for dataset:', dataset);
+        
+        // Create a promise with timeout - NEVER hang for more than 3 seconds
+        const fetchPromise = fetch('api/get-available-years.php?dataset=' + encodeURIComponent(dataset));
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('API timeout after 3 seconds')), 3000)
+        );
+        
+        console.log('Fetching from API...');
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
+        console.log('API response received, status:', res.status);
+        
+        if (!res.ok) {
+            throw new Error('API returned status ' + res.status);
+        }
+        
+        const data = await res.json();
+        console.log('API data:', data);
+        
+        if (data.success && data.years && data.years.length > 0) {
+            yearSelect.innerHTML = '';
+            data.years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                if (year === data.current_year) {
+                    option.selected = true;
+                    currentSelectedYear = year;
+                }
+                yearSelect.appendChild(option);
+            });
+            console.log('✓ Years loaded successfully:', data.years);
+            return;
+        } else {
+            throw new Error('No years in response');
+        }
+    } catch(apiError) {
+        console.error('❌ API error:', apiError.message, apiError);
+        // No fallback data - show empty state
+        const yearSelect = document.getElementById('yearFilter');
+        if (yearSelect) {
+            yearSelect.innerHTML = '<option value="">No data available - upload Excel file</option>';
+            console.log('⚠️ No year data from API');
+        }
+    }
+}
+
+// ============================================
+// LOAD TREND YEARS (parallel to loadAvailableYears)
+// ============================================
+async function loadTrendYears() {
+    try {
+        const yearSelect = document.getElementById('trendYearFilter');
+        if (!yearSelect) {
+            console.warn('Trend year filter dropdown not found');
+            return;
+        }
+        
+        yearSelect.innerHTML = '<option>Loading years...</option>';
+        
+        // Get dataset from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataset = urlParams.get('dataset') || '';
+        console.log('Loading years for trend chart with dataset:', dataset);
+        
+        // Create a promise with timeout - NEVER hang for more than 3 seconds
+        const fetchPromise = fetch('api/get-trend-years.php?dataset=' + encodeURIComponent(dataset));
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('API timeout after 3 seconds')), 3000)
+        );
+        
+        console.log('Fetching trend years from API...');
+        const res = await Promise.race([fetchPromise, timeoutPromise]);
+        console.log('Trend API response received, status:', res.status);
+        
+        if (!res.ok) {
+            throw new Error('API returned status ' + res.status);
+        }
+        
+        const data = await res.json();
+        console.log('Trend API data:', data);
+        
+        if (data.success && data.years && data.years.length > 0) {
+            yearSelect.innerHTML = '<option value="">All Years</option>';
+            data.years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
+            console.log('✓ Trend years loaded successfully:', data.years);
+            return;
+        } else {
+            throw new Error('No years in response');
+        }
+    } catch(apiError) {
+        console.error('❌ Trend API error:', apiError.message, apiError);
+        // Show empty state
+        const yearSelect = document.getElementById('trendYearFilter');
+        if (yearSelect) {
+            yearSelect.innerHTML = '<option value="">No data available - upload Excel file</option>';
+            console.log('⚠️ No trend year data from API');
+        }
+    }
+}
+
+async function handleYearChange(year) {
+    if (!year) return;
+    
+    currentSelectedYear = parseInt(year);
+    
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataset = urlParams.get('dataset') || '';
+        const res = await fetch('api/get-monthly-by-year.php?year=' + currentSelectedYear + '&dataset=' + encodeURIComponent(dataset));
+        const data = await res.json();
+        
+        if (data.success) {
+            // Update dashboard data
+            if (typeof dashboardData !== 'undefined') {
+                const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                const monthlyObject = {};
+                months.forEach((month, index) => {
+                    monthlyObject[month] = data.monthly_sales[index] || 0;
+                });
+                dashboardData.monthly_sales = monthlyObject;
+            }
+            
+            // Reinitialize the chart with new data
+            reinitializeMonthlyComparisonChart();
+        }
+    } catch(e) {
+        console.error('Error loading monthly data:', e);
+    }
+}
+
+function reinitializeMonthlyComparisonChart() {
+    // Destroy existing chart if it exists
+    if (monthlyComparisonChartInstance) {
+        monthlyComparisonChartInstance.destroy();
+        monthlyComparisonChartInstance = null;
+    }
+    
+    // Reinitialize with new data
+    initializeMonthlyComparisonChart();
+}
+
+// ============================================
+// AUTO-REFRESH FOR TREND CHART
+// ============================================
+let trendChartRefreshInterval = null;
+
+function startTrendChartAutoRefresh() {
+    // Clear any existing interval
+    if (trendChartRefreshInterval) {
+        clearInterval(trendChartRefreshInterval);
+    }
+    
+    // Refresh trend chart data every 30 seconds
+    trendChartRefreshInterval = setInterval(function() {
+        try {
+            const trendYearFilter = document.getElementById('trendYearFilter');
+            if (!trendYearFilter) return;
+            
+            // Get current selected year from dropdown
+            const currentYear = trendYearFilter.value;
+            console.log('🔄 Auto-refreshing trend chart for year:', currentYear || 'All Years');
+            
+            // Call the handler with current year (or empty string for "All Years")
+            if (typeof handleTrendYearChange === 'function') {
+                handleTrendYearChange(currentYear);
+            }
+        } catch(e) {
+            console.error('Error in trend chart auto-refresh:', e);
+        }
+    }, 30000); // Refresh every 30 seconds
+}
+
+function stopTrendChartAutoRefresh() {
+    if (trendChartRefreshInterval) {
+        clearInterval(trendChartRefreshInterval);
+        trendChartRefreshInterval = null;
+        console.log('Trend chart auto-refresh stopped');
+    }
+}
+
 function initializeCharts() {
+    // Load available years first
+    loadAvailableYears();
+    
+    // Load available years for trend chart
+    loadTrendYears();
+    
+    // Set a timeout - if years don't load in 3 seconds, just use current year
+    setTimeout(function() {
+        const yearSelect = document.getElementById('yearFilter');
+        if (yearSelect && yearSelect.innerHTML.includes('Loading years')) {
+            console.log('Year loading timeout - using fallback');
+            const currentYear = new Date().getFullYear();
+            yearSelect.innerHTML = '<option value="' + currentYear + '" selected>' + currentYear + '</option>';
+            currentSelectedYear = currentYear;
+        }
+    }, 3000);
+
+    // Set a timeout - if trend years don't load in 3 seconds, show empty state
+    setTimeout(function() {
+        const trendYearSelect = document.getElementById('trendYearFilter');
+        if (trendYearSelect && trendYearSelect.innerHTML.includes('Loading years')) {
+            console.log('Trend year loading timeout - using fallback');
+            trendYearSelect.innerHTML = '<option value="">All Years</option>';
+        }
+    }, 3000);
+    
     // Sparklines are above the fold — render immediately
     initializeSparklineCharts();
 
@@ -782,6 +1042,12 @@ function initializeCharts() {
                     const match = lazyCharts.find(c => c.id === entry.target.id);
                     if (match) {
                         match.init();
+                        // Start auto-refresh when trend chart becomes visible
+                        if (match.id === 'trendChart') {
+                            setTimeout(function() {
+                                startTrendChartAutoRefresh();
+                            }, 500);
+                        }
                         observer.unobserve(entry.target);
                     }
                 }
@@ -796,6 +1062,8 @@ function initializeCharts() {
         // Fallback: init all after a short delay
         setTimeout(function () {
             lazyCharts.forEach(c => c.init());
+            // Start auto-refresh for trend chart in fallback
+            startTrendChartAutoRefresh();
         }, 300);
     }
 }
@@ -979,13 +1247,13 @@ function initializeMonthlyComparisonChart() {
         'rgba(247, 37, 133, 0.9)'
     ];
 
-    new Chart(ctx, {
+    monthlyComparisonChartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
             labels: months,
             datasets: [
                 {
-                    label: 'Delivered',
+                    label: 'Delivered (' + currentSelectedYear + ')',
                     data: deliveredData,
                     backgroundColor: months.map((_, i) => monthlyPalette[i % monthlyPalette.length]),
                     borderColor: months.map((_, i) => monthlyPalette[i % monthlyPalette.length].replace('0.9', '1')),

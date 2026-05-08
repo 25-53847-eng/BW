@@ -1239,20 +1239,20 @@ $yearOrders = json_encode(array_column($yearlySales, 'orders'));
 
             <!-- Summary Cards -->
             <div class="summary-cards">
-                <div class="summary-card highlight">
+                <div class="summary-card highlight" title="Total units sold to companies (excludes stock additions). Sum of all quantities where company name is recorded.">
                     <div class="icon"><i class="fas fa-boxes"></i></div>
                     <div class="value"><?php echo number_format($allTimeTotal['units']); ?></div>
-                    <div class="label">All-Time Units</div>
+                    <div class="label">All-Time Units <i class="fas fa-info-circle" style="font-size:11px;opacity:0.7;cursor:help;" title="Sum of quantities sold to companies across all records"></i></div>
                 </div>
-                <div class="summary-card highlight">
+                <div class="summary-card highlight" title="Total number of delivery records from database. Each row = 1 order.">
                     <div class="icon"><i class="fas fa-file-invoice"></i></div>
                     <div class="value"><?php echo number_format($allTimeTotal['orders']); ?></div>
-                    <div class="label">All-Time Orders</div>
+                    <div class="label">All-Time Orders <i class="fas fa-info-circle" style="font-size:11px;opacity:0.7;cursor:help;" title="Count of all delivery records in the database"></i></div>
                 </div>
-                <div class="summary-card highlight">
+                <div class="summary-card highlight" title="Total sales amount from all orders. Calculated using recorded total_amount or (quantity × unit_price).">
                     <div class="icon"><i class="fas fa-sack-dollar"></i></div>
                     <div class="value money-value">PHP <?php echo number_format($allTimeTotal['sales'], 2); ?></div>
-                    <div class="label">All-Time Sales Amount</div>
+                    <div class="label">All-Time Sales Amount <i class="fas fa-info-circle" style="font-size:11px;opacity:0.7;cursor:help;" title="Sum of all sales values (total_amount or quantity × unit_price)"></i></div>
                 </div>
                 <div class="summary-card">
                     <div class="icon"><i class="fas fa-calendar-check"></i></div>
@@ -1299,8 +1299,16 @@ $yearOrders = json_encode(array_column($yearlySales, 'orders'));
 
             <!-- Monthly Sales Table -->
             <div class="table-container">
-                <div class="table-header">
-                    <h3 id="tableMonthlyHeader"><i class="fas fa-table"></i> Monthly Sales Breakdown - <?php echo $selectedYear; ?></h3>
+                <div class="table-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="tableMonthlyHeader" style="margin: 0;"><i class="fas fa-table"></i> Monthly Sales Breakdown - <?php echo $selectedYear; ?></h3>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <label for="monthlyYearSelect" style="font-size: 12px; color: #666; margin: 0; white-space: nowrap;">Filter by Year:</label>
+                        <select id="monthlyYearSelect" onchange="updateMonthlyTableYear()" style="background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 12px; cursor: pointer; outline: none;">
+                            <?php foreach ($availableYears as $year): ?>
+                            <option value="<?php echo $year; ?>" <?php echo $year == $selectedYear ? 'selected' : ''; ?>><?php echo $year; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
                 <table class="sales-table">
                     <thead>
@@ -1663,6 +1671,18 @@ $yearOrders = json_encode(array_column($yearlySales, 'orders'));
                     // Fallback to full reload on error
                     window.location.href = url;
                 });
+        }
+
+        // Update monthly table when year filter changes
+        function updateMonthlyTableYear() {
+            const year = document.getElementById('monthlyYearSelect').value;
+            const urlParams = new URLSearchParams(window.location.search);
+            const dataset = urlParams.get('dataset') || '';
+            
+            // Navigate to the new year (reload page with updated year parameter)
+            let newUrl = '?year=' + year;
+            if (dataset) newUrl += '&dataset=' + encodeURIComponent(dataset);
+            window.location.href = newUrl;
         }
 
         // Year selector — live update via AJAX (legacy function for backward compatibility)

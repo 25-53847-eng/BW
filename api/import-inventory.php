@@ -85,7 +85,9 @@ try {
     $map = [];
 
     // 9. Map required columns
-    $required = ['ITEMS', 'DESCRIPTION', 'UOM', 'INVENTORY'];
+    // CRITICAL: "INVENTORY" is a ROUTING MARKER, not quantity!
+    // The actual quantity is in "Quantity" column
+    $required = ['ITEMS', 'DESCRIPTION', 'UOM', 'QUANTITY'];
     foreach ($required as $req) {
         $found = false;
         foreach ($cols as $col) {
@@ -100,10 +102,11 @@ try {
         }
     }
 
-    // 10. Map optional columns
-    foreach (['BOX', 'STATUS', 'NOTES'] as $opt) {
+    // 10. Map optional columns including INVENTORY (routing marker) and Sold To
+    foreach (['BOX', 'STATUS', 'NOTES', 'INVENTORY', 'SOLD TO'] as $opt) {
         foreach ($cols as $col) {
-            if (strtoupper(trim($col)) === strtoupper(trim($opt))) {
+            if (strtoupper(trim($col)) === strtoupper(trim($opt)) || 
+                (strtoupper(trim($opt)) === 'SOLD TO' && (strtoupper(trim($col)) === 'SOLD_TO'))) {
                 $map[$opt] = $col;
                 break;
             }
@@ -131,7 +134,15 @@ try {
         $box = isset($map['BOX'], $row[$map['BOX']]) ? trim($row[$map['BOX']]) : '';
         $modelNo = isset($row[$map['ITEMS']]) ? trim($row[$map['ITEMS']]) : '';
         $desc = isset($row[$map['DESCRIPTION']]) ? trim($row[$map['DESCRIPTION']]) : '';
-        $qty = isset($row[$map['INVENTORY']]) ? intval($row[$map['INVENTORY']]) : 0;
+        
+        // CRITICAL FIX: Get quantity from "Quantity" column, NOT "INVENTORY"
+        $qty = isset($map['QUANTITY'], $row[$map['QUANTITY']]) ? intval($row[$map['QUANTITY']]) : 0;
+        
+        // Get INVENTORY column as routing marker (e.g., "Stock in Manila", "INVENTORY")
+        $inventory_marker = isset($map['INVENTORY'], $row[$map['INVENTORY']]) ? trim($row[$map['INVENTORY']]) : '';
+        
+        // Get Sold To for additional routing info
+        $sold_to = isset($map['SOLD TO'], $row[$map['SOLD TO']]) ? trim($row[$map['SOLD TO']]) : '';
 
         if (!$modelNo) {
             $failed++;
@@ -143,16 +154,32 @@ try {
         $name = $desc ?: $modelNo;
         $src = "Upload: $filename";
 
+        // AUTO-ROUTING based on INVENTORY column marker
+        // If INVENTORY = "Stock in Manila" → Andison Manila
+        // Otherwise → Stock Addition (general inventory)
+        $company_name = 'Stock Addition';
+        $sold_to_for_db = $inventory_marker; // Store the routing marker
+        
+        if (!empty($inventory_marker)) {
+            $marker_lower = strtolower(trim($inventory_marker));
+            if (strpos($marker_lower, 'stock in manila') !== false || 
+                strpos($marker_lower, 'andison') !== false ||
+                strpos($marker_lower, 'andiso') !== false) {
+                $company_name = 'to Andison Manila';
+            }
+        }
+
         // Escape for SQL
         $code_esc = $conn->real_escape_string($code);
         $name_esc = $conn->real_escape_string($name);
         $src_esc = $conn->real_escape_string($src);
         $box_esc = $conn->real_escape_string($box);
         $modelNo_esc = $conn->real_escape_string($modelNo);
+        $sold_to_esc = $conn->real_escape_string($sold_to_for_db);
 
         // Always INSERT as new record (don't check for duplicates)
         // This allows same item codes to be imported multiple times
-        $sql = "INSERT INTO delivery_records (item_code, item_name, box_code, model_no, quantity, company_name, notes, status, delivery_month, delivery_day, delivery_year, dataset_name, created_at, updated_at) VALUES ('$code_esc', '$name_esc', '$box_esc', '$modelNo_esc', $qty, 'Stock Addition', '$src_esc', 'Inventory', 'Inventory', 1, $current_year, '$datasetName', '$now', '$now')";
+        $sql = "INSERT INTO delivery_records (item_code, item_name, box_code, model_no, quantity, company_name, sold_to, notes, status, delivery_month, delivery_day, delivery_year, dataset_name, created_at, updated_at) VALUES ('$code_esc', '$name_esc', '$box_esc', '$modelNo_esc', $qty, '$company_name', '$sold_to_esc', '$src_esc', 'Inventory', 'Inventory', 1, $current_year, '$datasetName', '$now', '$now')";
         
         $result = $conn->query($sql);
         if ($result) {

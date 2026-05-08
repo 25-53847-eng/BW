@@ -15,7 +15,7 @@ $conn = null;
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name, 3307);
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name, 3306);
     $conn->set_charset('utf8mb4');
 
     $activeDbResult = $conn->query('SELECT DATABASE() AS db_name');
