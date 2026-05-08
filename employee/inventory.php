@@ -739,7 +739,7 @@ if ($poItemsQuery) {
             font-weight: 700;
             letter-spacing: 0.5px;
             margin-bottom: 6px;
-            font-family: 'Arial', sans-serif;
+            font-family: Verdana, sans-serif;
         }
 
         .init-stock-item input[type="text"],
@@ -2089,7 +2089,7 @@ if ($poItemsQuery) {
                             <td <?php echo $fileTooltip; ?> style="<?php echo $item['source_file'] ? 'cursor: help; text-decoration: underline dotted; text-decoration-color: #888;' : ''; ?>"><?php echo htmlspecialchars($itemsDisplay); ?></td>
                             <td><?php echo htmlspecialchars($item['name']); ?></td>
                             <td style="text-align: center; font-weight: 500;">
-                                <span style="color: #4a90e2; font-size: 13px; font-family: 'Courier New', monospace;">
+                                <span style="color: #4a90e2; font-size: 13px; font-family: Verdana, sans-serif;">
                                     <?php echo htmlspecialchars($item['serial_no'] ?: $item['code']); ?>
                                 </span>
                             </td>
@@ -2962,7 +2962,7 @@ if ($poItemsQuery) {
                                 color: #d4a017;
                                 font-size: 16px;
                                 font-weight: 700;
-                                font-family: 'Courier New', monospace;
+                                font-family: Verdana, sans-serif;
                                 letter-spacing: 0.5px;
                             ">${itemCode}</div>
                         </div>
@@ -3337,7 +3337,7 @@ if ($poItemsQuery) {
                                     color: #f4d03f;
                                     font-size: 15px;
                                     font-weight: 600;
-                                    font-family: 'Courier New', monospace;
+                                    font-family: Verdana, sans-serif;
                                     transition: all 0.3s ease;
                                 " onfocus="this.style.borderColor='rgba(52, 152, 219, 0.5); this.style.background='rgba(52, 152, 219, 0.08)'" onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.background='rgba(255, 255, 255, 0.05)'">
                             </div>

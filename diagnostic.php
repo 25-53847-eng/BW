@@ -68,7 +68,7 @@ if ($elapsed > 100) {
 <head>
     <title>Diagnostic</title>
     <style>
-        body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+        body { font-family: Verdana, sans-serif; padding: 20px; background: #f5f5f5; }
         h2, h3 { color: #333; }
         table { background: white; border-collapse: collapse; margin: 10px 0; }
         td, th { padding: 8px; text-align: left; }

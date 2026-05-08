@@ -1452,10 +1452,10 @@ if ($warrantyTableExists) {
                 <title>${title} - ${dateStr}</title>
                 <style>
                     * { box-sizing: border-box; margin: 0; padding: 0; }
-                    body { font-family: Arial, Helvetica, sans-serif; color: #333; background: #f0f4f8; }
+                    body { font-family: Verdana, sans-serif; color: #333; background: #f0f4f8; }
                     .toolbar { background: #1a3a5c; padding: 12px 30px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
                     .toolbar span { color: #a0c8e8; font-size: 13px; }
-                    .btn-save { background: #f4d03f; color: #1a3a5c; border: none; padding: 10px 24px; font-size: 14px; font-weight: 700; border-radius: 6px; cursor: pointer; font-family: Arial, sans-serif; }
+                    .btn-save { background: #f4d03f; color: #1a3a5c; border: none; padding: 10px 24px; font-size: 14px; font-weight: 700; border-radius: 6px; cursor: pointer; font-family: Verdana, sans-serif; }
                     .btn-save:hover { background: #e6c230; }
                     .page { background: #fff; max-width: 1500px; margin: 18px auto; padding: 26px; box-shadow: 0 2px 12px rgba(0,0,0,0.12); border-radius: 4px; }
                     .pdf-header { background: #1a3a5c; color: white; padding: 18px 22px; border-radius: 8px; margin-bottom: 22px; }

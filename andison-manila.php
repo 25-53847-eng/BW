@@ -233,7 +233,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
         .item-code {
             color: #60a5fa;
             font-weight: 600;
-            font-family: 'Courier New', monospace;
+            font-family: Verdana, sans-serif;
         }
 
         .quantity {
