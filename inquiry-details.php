@@ -297,7 +297,9 @@ $autoEditMode = isset($_GET['edit']);
                         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 24px;">
                             <div>
                                 <label style="display: block; margin-bottom: 10px; color: #7f8c8d; font-weight: 600; font-size: 12px; letter-spacing: 0.3px; text-transform: uppercase;">Client</label>
-                                <input type="text" name="customer" value="<?php echo h($inquiry['order_customer']); ?>" required style="width: 100%; padding: 12px 14px; border: 1px solid #d1d9e6; border-radius: 8px; font-family: inherit; font-size: 14px;">
+                                <select id="customer_edit" name="customer" required style="width: 100%; padding: 12px 14px; border: 1px solid #d1d9e6; border-radius: 8px; font-family: inherit; font-size: 14px; cursor: pointer;">
+                                    <option value="">Select Client Company</option>
+                                </select>
                             </div>
                             <div>
                                 <label style="display: block; margin-bottom: 10px; color: #7f8c8d; font-weight: 600; font-size: 12px; letter-spacing: 0.3px; text-transform: uppercase;">Inquiry Date</label>
@@ -352,6 +354,34 @@ $autoEditMode = isset($_GET['edit']);
                 <input type="hidden" name="action" value="delete_inquiry">
             </form>
 
+            <!-- Add New Company Modal -->
+            <div class="modal-backdrop-details" id="addCompanyModalDetails" style="display: none; position: fixed; inset: 0; background: rgba(10, 16, 24, 0.72); align-items: flex-start; justify-content: center; z-index: 9999; padding: 20px; padding-top: 80px; overflow-y: auto;">
+                <div class="modal-card-details" style="width: min(920px, 100%); background: linear-gradient(135deg, #1e2a38, #2a3f5f); border: 1px solid rgba(255,255,255,0.1); border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.35); padding: 22px; margin-bottom: 40px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px;">
+                        <h2 style="margin: 0; color: #fff; font-size: 22px;"><i class="fas fa-building"></i> Add New Company</h2>
+                        <button type="button" class="close-btn-details" onclick="closeAddCompanyModalDetails()" style="background: transparent; border: none; color: #fff; font-size: 28px; cursor: pointer; line-height: 1;">&times;</button>
+                    </div>
+                    <div class="add-company-content-details" style="padding: 20px 0;">
+                        <label for="newCompanyInputDetails" style="color: #dbe7f5; font-size: 14px; font-weight: 500; margin-bottom: 8px; display: block;">Company Name</label>
+                        <input 
+                            id="newCompanyInputDetails" 
+                            type="text" 
+                            style="width: 100%; box-sizing: border-box; border-radius: 10px; border: 1.5px solid rgba(91, 188, 255, 0.25); background: rgba(8, 14, 22, 0.45); color: #fff; padding: 14px 16px; font-size: 15px; font-family: inherit; transition: all 0.3s ease; margin-bottom: 8px;"
+                            placeholder="Enter company name" 
+                            autofocus
+                            maxlength="255"
+                        >
+                        <div style="font-size: 12px; color: #8a96a8; text-align: right;">
+                            <span id="charCountDetails">0</span>/255
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 18px;">
+                        <button class="action-btn-details" type="button" onclick="closeAddCompanyModalDetails()" style="padding: 12px 18px; border-radius: 10px; border: none; background: rgba(255,255,255,0.08); color: #fff; font-weight: 600; cursor: pointer;"><i class="fas fa-times"></i> Cancel</button>
+                        <button class="action-btn-details primary" type="button" onclick="confirmAddCompanyDetails()" style="padding: 12px 18px; border-radius: 10px; border: none; background: linear-gradient(135deg, #f4d03f, #f9d76a); color: #17324d; font-weight: 600; cursor: pointer;"><i class="fas fa-plus"></i> Add Company</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Delete Confirmation Modal -->
             <div id="deleteConfirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 10000; justify-content: center; align-items: center;">
                 <div style="background: white; border-radius: 16px; padding: 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); animation: slideUp 0.3s ease;">
@@ -379,6 +409,38 @@ $autoEditMode = isset($_GET['edit']);
                         transform: translateY(0);
                         opacity: 1;
                     }
+                }
+
+                /* Light mode styles for modal */
+                html.light-mode .modal-backdrop-details,
+                body.light-mode .modal-backdrop-details {
+                    background: rgba(241, 245, 249, 0.72);
+                }
+
+                html.light-mode .modal-card-details,
+                body.light-mode .modal-card-details {
+                    background: #ffffff;
+                    border-color: #dbe4f0;
+                    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+                }
+
+                html.light-mode .add-company-content-details label,
+                body.light-mode .add-company-content-details label {
+                    color: #0f172a;
+                }
+
+                html.light-mode .add-company-content-details input,
+                body.light-mode .add-company-content-details input {
+                    background: #ffffff;
+                    color: #0f172a;
+                    border-color: #cbd5e1;
+                }
+
+                html.light-mode .add-company-content-details input:focus,
+                body.light-mode .add-company-content-details input:focus {
+                    border-color: #2f5fa7;
+                    background: #f8fafc;
+                    box-shadow: 0 0 12px rgba(47, 95, 167, 0.15);
                 }
             </style>
         </main>
@@ -429,6 +491,137 @@ $autoEditMode = isset($_GET['edit']);
                 if (profileMenu) profileMenu.classList.remove('show');
             });
         });
+
+        // Populate client dropdown for edit mode
+        async function populateClientDropdownEdit() {
+            const customerSelect = document.getElementById('customer_edit');
+            if (!customerSelect) return;
+
+            const currentValue = '<?php echo h($inquiry['order_customer']); ?>';
+
+            try {
+                const response = await fetch('api/get-clients.php');
+                const data = await response.json();
+                
+                if (data.success && Array.isArray(data.companies)) {
+                    customerSelect.innerHTML = '<option value="">Select Client Company</option>';
+                    
+                    data.companies.forEach(company => {
+                        const option = document.createElement('option');
+                        option.value = company;
+                        option.textContent = company;
+                        if (company === currentValue) {
+                            option.selected = true;
+                        }
+                        customerSelect.appendChild(option);
+                    });
+                    
+                    // Add "Add New Company" option
+                    const addNewOption = document.createElement('option');
+                    addNewOption.value = '__ADD_NEW__';
+                    addNewOption.textContent = '+ Add New Company';
+                    addNewOption.style.fontWeight = 'bold';
+                    addNewOption.style.color = '#5bbcff';
+                    customerSelect.appendChild(addNewOption);
+
+                    // Add change event listener
+                    customerSelect.addEventListener('change', handleAddNewCompanyDetails);
+                }
+            } catch (error) {
+                console.error('Error fetching clients:', error);
+            }
+        }
+
+        function handleAddNewCompanyDetails() {
+            const customerSelect = document.getElementById('customer_edit');
+            const addCompanyModal = document.getElementById('addCompanyModalDetails');
+            if (!customerSelect || !addCompanyModal) return;
+
+            if (customerSelect.value === '__ADD_NEW__') {
+                addCompanyModal.style.display = 'flex';
+                document.body.style.overflow = 'hidden';
+                
+                const input = document.getElementById('newCompanyInputDetails');
+                if (input) {
+                    input.value = '';
+                    setTimeout(() => input.focus(), 100);
+                }
+            }
+        }
+
+        function closeAddCompanyModalDetails() {
+            const addCompanyModal = document.getElementById('addCompanyModalDetails');
+            if (!addCompanyModal) return;
+            addCompanyModal.style.display = 'none';
+            document.body.style.overflow = '';
+            
+            const customerSelect = document.getElementById('customer_edit');
+            if (customerSelect) {
+                customerSelect.value = '';
+            }
+        }
+
+        function confirmAddCompanyDetails() {
+            const customerSelect = document.getElementById('customer_edit');
+            const input = document.getElementById('newCompanyInputDetails');
+            const addCompanyModal = document.getElementById('addCompanyModalDetails');
+            
+            if (!customerSelect || !input || !addCompanyModal) return;
+
+            const newCompany = input.value.trim();
+            
+            if (newCompany === '') {
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length < 2) {
+                alert('Company name must be at least 2 characters long.');
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length > 255) {
+                alert('Company name must not exceed 255 characters.');
+                input.focus();
+                return;
+            }
+            
+            const existingOption = Array.from(customerSelect.options).find(
+                option => option.value === newCompany && option.value !== '__ADD_NEW__'
+            );
+            
+            if (existingOption) {
+                alert('This company already exists.');
+                input.focus();
+                return;
+            }
+            
+            const newOption = document.createElement('option');
+            newOption.value = newCompany;
+            newOption.textContent = newCompany;
+            
+            const addNewOption = customerSelect.querySelector('option[value="__ADD_NEW__"]');
+            customerSelect.insertBefore(newOption, addNewOption);
+            
+            customerSelect.value = newCompany;
+            
+            closeAddCompanyModalDetails();
+        }
+
+        // Character counter for new company input
+        const newCompanyInputDetails = document.getElementById('newCompanyInputDetails');
+        if (newCompanyInputDetails) {
+            newCompanyInputDetails.addEventListener('input', function() {
+                const charCountDetails = document.getElementById('charCountDetails');
+                if (charCountDetails) {
+                    charCountDetails.textContent = this.value.length;
+                }
+            });
+        }
+
+        // Initialize dropdown when page loads
+        populateClientDropdownEdit();
     </script>
 </body>
 </html>

@@ -97,7 +97,17 @@ function isWarrantyReplacementItem($itemName, $groupings) {
 }
 
 // Total delivered to Andison (all records in delivery_records)
-$result = $conn->query("SELECT COUNT(*) as total_orders, COALESCE(SUM(quantity), 0) as total_units FROM delivery_records WHERE sold_to = 'Andison Industrial'$combined_filter");
+// Updated to work with actual data structure where items are delivered to "to Andison Manila"
+$result = $conn->query("
+    SELECT COUNT(*) as total_orders, COALESCE(SUM(quantity), 0) as total_units 
+    FROM delivery_records 
+    WHERE (
+        company_name = 'to Andison Manila' 
+        OR transferred_to = 'to Andison Manila'
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
+    )
+    AND quantity > 0
+");
 if ($result && $row = $result->fetch_assoc()) {
     $totalAndison = intval($row['total_units']);
 }
@@ -108,13 +118,20 @@ if ($result && $row = $result->fetch_assoc()) {
     $companyCount = intval($row['company_count']);
 }
 
-// Monthly data for charts
+// Monthly data for charts - updated for Andison Manila data structure
 $result = $conn->query("
     SELECT delivery_month, 
            COUNT(*) as order_count,
            COALESCE(SUM(quantity), 0) as total_qty
     FROM delivery_records 
-    WHERE sold_to = 'Andison Industrial' AND delivery_month IS NOT NULL AND delivery_month != ''$combined_filter
+    WHERE (
+        company_name = 'to Andison Manila' 
+        OR transferred_to = 'to Andison Manila'
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
+    )
+    AND delivery_month IS NOT NULL 
+    AND delivery_month != ''
+    AND quantity > 0
     GROUP BY delivery_month 
     ORDER BY CASE delivery_month
         WHEN 'January' THEN 1 WHEN 'February' THEN 2 WHEN 'March' THEN 3
@@ -148,22 +165,24 @@ if ($result) {
     }
 }
 
-// Products/Items data - exclude warranty items, orders, and inventory items, and show only significant items
+// Products/Items data - updated for Andison Manila data structure
 $result = $conn->query("
     SELECT item_name, item_code,
            COUNT(*) as order_count,
            COALESCE(SUM(quantity), 0) as total_qty,
            COUNT(DISTINCT company_name) as company_count
     FROM delivery_records 
-    WHERE sold_to = 'Andison Industrial'
-        AND item_name IS NOT NULL
-        AND company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition')
-        AND (sold_to IS NOT NULL AND sold_to != '')
-        AND NOT (LOWER(TRIM(COALESCE(sold_to, ''))) IN ('stock in manila') OR LOWER(TRIM(COALESCE(sold_to, ''))) LIKE '%stock in manila%')
-        AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')
-        $combined_filter
+    WHERE (
+        company_name = 'to Andison Manila' 
+        OR transferred_to = 'to Andison Manila'
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
+    )
+    AND item_name IS NOT NULL
+    AND company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition')
+    AND quantity > 0
+    AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')
     GROUP BY item_name, item_code
-    HAVING COALESCE(SUM(quantity), 0) > 5
+    HAVING COALESCE(SUM(quantity), 0) > 0
     ORDER BY total_qty DESC
     LIMIT 30
 ");
@@ -207,6 +226,108 @@ foreach ($topCompanies as $company) {
         'value' => intval($company['total_qty'])
     ];
 }
+
+// ===== INSIGHTS & RECOMMENDATIONS GENERATION =====
+$insights = [];
+$recommendations = [];
+
+// Calculate growth metrics
+$totalSoldUnits = 0;
+foreach ($topCompanies as $company) {
+    $totalSoldUnits += intval($company['total_qty']);
+}
+
+$totalUnits = $totalAndison + $totalSoldUnits;
+$averageOrderSize = !empty($topCompanies) ? $totalSoldUnits / count($topCompanies) : 0;
+
+// Insight 1: Market Share & Performance
+if ($totalAndison > 0 && $totalSoldUnits > 0) {
+    $andisonPercentage = round(($totalAndison / $totalUnits) * 100, 1);
+    $companySalesPercentage = round(($totalSoldUnits / $totalUnits) * 100, 1);
+    $insights[] = "📈 **Market Split**: Andison receives {$andisonPercentage}% of supply ({$totalAndison} units) while {$companyCount} companies purchased {$companySalesPercentage}% ({$totalSoldUnits} units).";
+}
+
+// Insight 2: Top Company Performance
+if (!empty($topCompanies)) {
+    $topCompany = $topCompanies[0];
+    $topCompanyQty = intval($topCompany['total_qty']);
+    $topCompanyName = htmlspecialchars($topCompany['company_name']);
+    $topCompanyShare = round(($topCompanyQty / $totalSoldUnits) * 100, 1);
+    $insights[] = "🎯 **Top Client**: {$topCompanyName} leads with {$topCompanyQty} units ({$topCompanyShare}% of company sales).";
+}
+
+// Insight 3: Model Distribution
+if (!empty($groupA) && !empty($groupB)) {
+    $groupATotal = array_sum(array_map(function($p) { return intval($p['total_qty']); }, $groupA));
+    $groupBTotal = array_sum(array_map(function($p) { return intval($p['total_qty']); }, $groupB));
+    $groupAPercent = round(($groupATotal / max($groupATotal + $groupBTotal, 1)) * 100, 1);
+    $insights[] = "🔧 **Product Mix**: Single Gas (Group A) dominates at {$groupAPercent}% of sales, indicating strong market demand for entry-level models.";
+}
+
+// Insight 4: Market Opportunity
+if ($companyCount > 0) {
+    $recommendations[] = "🚀 **Expand Market Reach**: Currently serving {$companyCount} companies. Target to reach at least 300+ companies this year through industry-specific outreach (mining, manufacturing, chemical plants, refineries).";
+} else {
+    $recommendations[] = "🚀 **Build Customer Base**: Start targeted B2B outreach to industries with high gas detection needs.";
+}
+
+// Insight 5: Top Product Optimization
+if (!empty($groupA)) {
+    $topModel = $groupA[0];
+    $topModelName = htmlspecialchars($topModel['item_name'] ?: $topModel['item_code']);
+    $topModelQty = intval($topModel['total_qty']);
+    $recommendations[] = "💡 **Best-Seller Bundle Strategy**: Your top Single Gas model ({$topModelName}) sold {$topModelQty} units. Create bundle packages with spare parts, maintenance contracts, or training to increase order frequency and customer lifetime value.";
+}
+
+// Insight 6: Multi-Gas Potential
+if (!empty($groupB)) {
+    $groupATotal = array_sum(array_map(function($p) { return intval($p['total_qty']); }, $groupA));
+    $groupBTotal = array_sum(array_map(function($p) { return intval($p['total_qty']); }, $groupB));
+    $groupBPercent = round(($groupBTotal / max($groupATotal + $groupBTotal, 1)) * 100, 1);
+    $recommendations[] = "⭐ **Premium Upsell Program**: Multi-Gas detectors (Group B) represent only {$groupBPercent}% of sales—these are high-margin products. Train sales team to position them as upgrades for safety-critical applications and negotiate volume discounts with suppliers.";
+} else if (!empty($groupA)) {
+    $recommendations[] = "⭐ **Develop Premium Product Line**: Expand Multi-Gas detector offerings to tap into high-margin premium market segment currently underserved.";
+}
+
+// Insight 7: Sales Channel Focus
+if (count($topCompanies) >= 5) {
+    $top5Total = 0;
+    for ($i = 0; $i < min(5, count($topCompanies)); $i++) {
+        $top5Total += intval($topCompanies[$i]['total_qty']);
+    }
+    $top5Percent = round(($top5Total / max($totalSoldUnits, 1)) * 100, 1);
+    $recommendations[] = "🎪 **VIP Account Management**: Your top 5 clients generate {$top5Percent}% of revenue. Assign dedicated account managers, schedule quarterly business reviews, and offer loyalty incentives to ensure retention and growth.";
+}
+
+// Insight 8: Andison Revenue Potential
+if ($totalAndison > 500) {
+    $estimatedRevenue = round($totalAndison * 540 / 1000, 1);
+    $recommendations[] = "💰 **Optimize Andison Supply Chain**: With {$totalAndison} units delivered to Andison (est. ₱{$estimatedRevenue}K revenue), negotiate better procurement terms, implement just-in-time delivery to reduce inventory costs, and establish long-term supply agreements.";
+}
+
+// Insight 9: Seasonal Trends
+$maxMonth = array_reduce($monthlyDelivered, function($max, $val) { return $val > $max ? $val : $max; }, 0);
+$minMonth = array_reduce($monthlyDelivered, function($min, $val) { return $val < $min && $val > 0 ? $val : $min; }, PHP_INT_MAX);
+if ($maxMonth > $minMonth * 1.5 && $minMonth > 0) {
+    $maxMonthIdx = array_search($maxMonth, $monthlyDelivered);
+    $maxMonthName = $monthNames[$maxMonthIdx];
+    $insights[] = "📊 **Seasonal Pattern**: Sales peak in {$maxMonthName}. Plan inventory and marketing campaigns to capitalize on high-demand periods.";
+}
+
+// Insight 10: Growth Opportunity
+if (count($topCompanies) > 5) {
+    $totalTopCompanies = 0;
+    for ($i = 0; $i < min(10, count($topCompanies)); $i++) {
+        $totalTopCompanies += intval($topCompanies[$i]['total_qty']);
+    }
+    $remainingCompanies = $totalSoldUnits - $totalTopCompanies;
+    $smallerCustomerCount = $companyCount - 10;
+    if ($remainingCompanies > 0 && $companyCount > 10) {
+        $smallerPercent = round(($remainingCompanies / $totalSoldUnits) * 100, 1);
+        $recommendations[] = "📱 **Long-Tail Customer Development**: {$smallerCustomerCount} smaller customers account for {$smallerPercent}% of sales. Create starter packages and SME-focused campaigns to convert these into repeat customers.";
+    }
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -450,6 +571,156 @@ foreach ($topCompanies as $company) {
             table th, table td {
                 padding: 10px;
             }
+
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 22px;
+            margin-bottom: 30px;
+        }
+
+        .insights-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .insights-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 26px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .insights-card:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .insights-card-primary {
+            border-left: 5px solid #ffd84d;
+            background: linear-gradient(135deg, rgba(255, 216, 77, 0.08) 0%, rgba(74, 123, 167, 0.08) 100%);
+        }
+
+        .insights-card-secondary {
+            border-left: 5px solid #4db8ff;
+            background: linear-gradient(135deg, rgba(77, 184, 255, 0.08) 0%, rgba(74, 123, 167, 0.08) 100%);
+        }
+
+        .insights-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .insights-header i {
+            font-size: 24px;
+            color: #ffd84d;
+        }
+
+        .insights-card-secondary .insights-header i {
+            color: #4db8ff;
+        }
+
+        .insights-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .insights-content {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .insight-item,
+        .recommendation-item {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 8px;
+            border-left: 3px solid rgba(255, 216, 77, 0.5);
+            transition: all 0.2s ease;
+        }
+
+        .recommendation-item {
+            border-left-color: rgba(77, 184, 255, 0.5);
+        }
+
+        .insight-item:hover,
+        .recommendation-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(2px);
+        }
+
+        .insight-item p,
+        .recommendation-item p {
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #e2ecf8;
+        }
+
+        /* Light mode overrides for insights */
+        html.light-mode .insights-card,
+        body.light-mode .insights-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 245, 250, 0.95) 100%);
+            border-color: rgba(100, 150, 200, 0.3);
+        }
+
+        html.light-mode .insights-card-primary,
+        body.light-mode .insights-card-primary {
+            border-left-color: #ff9800;
+            background: linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%);
+        }
+
+        html.light-mode .insights-card-secondary,
+        body.light-mode .insights-card-secondary {
+            border-left-color: #2196F3;
+            background: linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(255, 255, 255, 0.95) 100%);
+        }
+
+        html.light-mode .insights-header h3,
+        body.light-mode .insights-header h3 {
+            color: #2a3a4a;
+        }
+
+        html.light-mode .insights-header i,
+        body.light-mode .insights-header i {
+            color: #ff9800;
+        }
+
+        html.light-mode .insights-card-secondary .insights-header i,
+        body.light-mode .insights-card-secondary .insights-header i {
+            color: #2196F3;
+        }
+
+        html.light-mode .insight-item p,
+        html.light-mode .recommendation-item p,
+        body.light-mode .insight-item p,
+        body.light-mode .recommendation-item p {
+            color: #3a4a5a;
+        }
+
+        html.light-mode .insight-item,
+        html.light-mode .recommendation-item,
+        body.light-mode .insight-item,
+        body.light-mode .recommendation-item {
+            background: rgba(0, 0, 0, 0.04);
         }
         
         @media (max-width: 480px) {
@@ -556,6 +827,52 @@ foreach ($topCompanies as $company) {
                         <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
                     </div>
                     <div class="gauge-value" id="gaugeValueCompanies"><?php echo number_format($companyCount); ?></div>
+                </div>
+            </div>
+
+            <!-- INSIGHTS & RECOMMENDATIONS SECTION -->
+            <h2 class="section-title">💡 Key Insights & Sales Opportunities</h2>
+            <div class="insights-grid">
+                <!-- LEFT COLUMN: KEY INSIGHTS -->
+                <div class="insights-column">
+                    <div class="insights-card insights-card-primary">
+                        <div class="insights-header">
+                            <i class="fas fa-lightbulb"></i>
+                            <h3>Current Performance Insights</h3>
+                        </div>
+                        <div class="insights-content">
+                            <?php if (!empty($insights)): ?>
+                                <?php foreach ($insights as $index => $insight): ?>
+                                    <div class="insight-item">
+                                        <p><?php echo $insight; ?></p>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p style="color: #aaa;">No insights available for current dataset.</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: RECOMMENDATIONS -->
+                <div class="insights-column">
+                    <div class="insights-card insights-card-secondary">
+                        <div class="insights-header">
+                            <i class="fas fa-rocket"></i>
+                            <h3>Recommended Actions to Boost Sales</h3>
+                        </div>
+                        <div class="insights-content">
+                            <?php if (!empty($recommendations)): ?>
+                                <?php foreach ($recommendations as $index => $rec): ?>
+                                    <div class="recommendation-item">
+                                        <p><?php echo $rec; ?></p>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p style="color: #aaa;">No recommendations available for current dataset.</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
 

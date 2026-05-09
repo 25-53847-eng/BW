@@ -67,12 +67,8 @@ function parse_cell_styles($rawStyles) {
 }
 
 function is_inquiry_admin(): bool {
-    $name = strtolower(trim((string) ($_SESSION['user_name'] ?? '')));
-    $email = strtolower(trim((string) ($_SESSION['user_email'] ?? '')));
-    $allowedNames = ['admin', 'lizette macalindol'];
-    $allowedEmails = ['lizuu131@gmail.com', 'lizettemacalindol.official@gmail.com'];
-
-    return in_array($name, $allowedNames, true) || in_array($email, $allowedEmails, true) || str_contains($email, 'admin');
+    // Any user with 'admin' role can add inquiry items
+    return (($_SESSION['user_role'] ?? '') === 'admin');
 }
 
 $flash = $_SESSION['inquiry_flash'] ?? null;
@@ -438,6 +434,79 @@ $canAddInquiry = is_inquiry_admin();
         body.light-mode .close-btn {
             color: #0f172a;
         }
+
+        /* Add Company Modal Styles */
+        .add-company-content {
+            padding: 20px 0;
+        }
+        .add-company-content .form-label {
+            color: #dbe7f5;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .add-company-content .form-input {
+            width: 100%;
+            box-sizing: border-box;
+            border-radius: 10px;
+            border: 1.5px solid rgba(91, 188, 255, 0.25);
+            background: rgba(8, 14, 22, 0.45);
+            color: #fff;
+            padding: 14px 16px;
+            font-size: 15px;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+        }
+        .add-company-content .form-input:focus {
+            outline: none;
+            border-color: #5bbcff;
+            background: rgba(8, 14, 22, 0.6);
+            box-shadow: 0 0 12px rgba(91, 188, 255, 0.15);
+        }
+        .add-company-content .form-input::placeholder {
+            color: #7a8a9f;
+        }
+        .char-counter {
+            font-size: 12px;
+            color: #8a96a8;
+            text-align: right;
+        }
+        .char-counter span {
+            color: #5bbcff;
+            font-weight: 600;
+        }
+
+        html.light-mode .add-company-content .form-label,
+        body.light-mode .add-company-content .form-label {
+            color: #0f172a;
+        }
+        html.light-mode .add-company-content .form-input,
+        body.light-mode .add-company-content .form-input {
+            background: #ffffff;
+            color: #0f172a;
+            border-color: #cbd5e1;
+        }
+        html.light-mode .add-company-content .form-input:focus,
+        body.light-mode .add-company-content .form-input:focus {
+            border-color: #2f5fa7;
+            background: #f8fafc;
+            box-shadow: 0 0 12px rgba(47, 95, 167, 0.15);
+        }
+        html.light-mode .add-company-content .form-input::placeholder,
+        body.light-mode .add-company-content .form-input::placeholder {
+            color: #cbd5e1;
+        }
+        html.light-mode .char-counter,
+        body.light-mode .char-counter {
+            color: #64748b;
+        }
+        html.light-mode .char-counter span,
+        body.light-mode .char-counter span {
+            color: #2f5fa7;
+        }
+
         @media (max-width: 900px) {
             .stats-grid, .form-grid { grid-template-columns: 1fr; }
             .main-content { padding: 20px 16px; }
@@ -647,7 +716,9 @@ $canAddInquiry = is_inquiry_admin();
                     <div class="form-grid">
                         <div class="form-group">
                             <label for="customer">Client</label>
-                            <input id="customer" name="customer" type="text" required>
+                            <select id="customer" name="customer" required>
+                                <option value="">Select Client Company</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="order_date">Inquiry Date</label>
@@ -719,16 +790,175 @@ $canAddInquiry = is_inquiry_admin();
             </div>
         </div>
 
+    <!-- Custom Add New Company Modal -->
+    <div class="modal-backdrop" id="addCompanyModal" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="addCompanyModalTitle">
+            <div class="modal-header">
+                <h2 class="modal-title" id="addCompanyModalTitle"><i class="fas fa-building"></i> Add New Company</h2>
+                <button type="button" class="close-btn" id="closeAddCompanyModalBtn" aria-label="Close add company modal">&times;</button>
+            </div>
+            <div class="add-company-content">
+                <label for="newCompanyInput" class="form-label">Company Name</label>
+                <input 
+                    id="newCompanyInput" 
+                    type="text" 
+                    class="form-input" 
+                    placeholder="Enter company name" 
+                    autofocus
+                    maxlength="255"
+                >
+                <div class="char-counter">
+                    <span id="charCount">0</span>/255
+                </div>
+            </div>
+            <div class="form-actions">
+                <button class="action-btn" id="cancelAddCompanyBtn" type="button"><i class="fas fa-times"></i> Cancel</button>
+                <button class="action-btn primary" id="confirmAddCompanyBtn" type="button"><i class="fas fa-plus"></i> Add Company</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const inquiryModal = document.getElementById('inquiryModal');
         const openInquiryModalBtn = document.getElementById('openInquiryModalBtn');
         const closeInquiryModalBtn = document.getElementById('closeInquiryModalBtn');
+
+        async function populateClientDropdown() {
+            const customerSelect = document.getElementById('customer');
+            if (!customerSelect) return;
+
+            try {
+                const response = await fetch('api/get-clients.php');
+                const data = await response.json();
+                
+                if (data.success && Array.isArray(data.companies)) {
+                    // Save current value if any
+                    const currentValue = customerSelect.value;
+                    
+                    // Clear and reset
+                    customerSelect.innerHTML = '<option value="">Select Client Company</option>';
+                    
+                    // Add each company as an option
+                    data.companies.forEach(company => {
+                        const option = document.createElement('option');
+                        option.value = company;
+                        option.textContent = company;
+                        customerSelect.appendChild(option);
+                    });
+                    
+                    // Add "Add New Company" option
+                    const addNewOption = document.createElement('option');
+                    addNewOption.value = '__ADD_NEW__';
+                    addNewOption.textContent = '+ Add New Company';
+                    addNewOption.style.fontWeight = 'bold';
+                    addNewOption.style.color = '#5bbcff';
+                    customerSelect.appendChild(addNewOption);
+                    
+                    // Restore previous value if it still exists
+                    if (currentValue && currentValue !== '__ADD_NEW__') {
+                        customerSelect.value = currentValue;
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching clients:', error);
+            }
+        }
+
+        function handleAddNewCompany() {
+            const customerSelect = document.getElementById('customer');
+            const addCompanyModal = document.getElementById('addCompanyModal');
+            if (!customerSelect || !addCompanyModal) return;
+
+            if (customerSelect.value === '__ADD_NEW__') {
+                // Open custom modal instead of prompt
+                addCompanyModal.classList.add('show');
+                addCompanyModal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+                
+                // Focus on input
+                const input = document.getElementById('newCompanyInput');
+                if (input) {
+                    input.value = '';
+                    setTimeout(() => input.focus(), 100);
+                }
+            }
+        }
+
+        function closeAddCompanyModal() {
+            const addCompanyModal = document.getElementById('addCompanyModal');
+            if (!addCompanyModal) return;
+            addCompanyModal.classList.remove('show');
+            addCompanyModal.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+            
+            // Reset dropdown
+            const customerSelect = document.getElementById('customer');
+            if (customerSelect) {
+                customerSelect.value = '';
+            }
+        }
+
+        function confirmAddCompany() {
+            const customerSelect = document.getElementById('customer');
+            const input = document.getElementById('newCompanyInput');
+            const addCompanyModal = document.getElementById('addCompanyModal');
+            
+            if (!customerSelect || !input || !addCompanyModal) return;
+
+            const newCompany = input.value.trim();
+            
+            if (newCompany === '') {
+                input.focus();
+                return;
+            }
+            
+            // Validate company name
+            if (newCompany.length < 2) {
+                alert('Company name must be at least 2 characters long.');
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length > 255) {
+                alert('Company name must not exceed 255 characters.');
+                input.focus();
+                return;
+            }
+            
+            // Check if company already exists in dropdown
+            const existingOption = Array.from(customerSelect.options).find(
+                option => option.value === newCompany && option.value !== '__ADD_NEW__'
+            );
+            
+            if (existingOption) {
+                alert('This company already exists.');
+                input.focus();
+                return;
+            }
+            
+            // Add new option before "Add New Company"
+            const newOption = document.createElement('option');
+            newOption.value = newCompany;
+            newOption.textContent = newCompany;
+            
+            const addNewOption = customerSelect.querySelector('option[value="__ADD_NEW__"]');
+            customerSelect.insertBefore(newOption, addNewOption);
+            
+            // Select the new company
+            customerSelect.value = newCompany;
+            
+            // Close modal
+            closeAddCompanyModal();
+        }
 
         function openInquiryModal() {
             if (!inquiryModal) return;
             inquiryModal.classList.add('show');
             inquiryModal.setAttribute('aria-hidden', 'false');
             document.body.style.overflow = 'hidden';
+            
+            // Populate client dropdown when modal opens
+            populateClientDropdown();
         }
 
         function closeInquiryModal() {
@@ -787,6 +1017,66 @@ $canAddInquiry = is_inquiry_admin();
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 closeInquiryModal();
+            }
+        });
+
+        // Customer select dropdown - handle "Add New Company"
+        const customerSelect = document.getElementById('customer');
+        if (customerSelect) {
+            customerSelect.addEventListener('change', handleAddNewCompany);
+        }
+
+        // Add Company Modal Event Listeners
+        const addCompanyModal = document.getElementById('addCompanyModal');
+        const closeAddCompanyModalBtn = document.getElementById('closeAddCompanyModalBtn');
+        const cancelAddCompanyBtn = document.getElementById('cancelAddCompanyBtn');
+        const confirmAddCompanyBtn = document.getElementById('confirmAddCompanyBtn');
+        const newCompanyInput = document.getElementById('newCompanyInput');
+
+        if (closeAddCompanyModalBtn) {
+            closeAddCompanyModalBtn.addEventListener('click', closeAddCompanyModal);
+        }
+
+        if (cancelAddCompanyBtn) {
+            cancelAddCompanyBtn.addEventListener('click', closeAddCompanyModal);
+        }
+
+        if (confirmAddCompanyBtn) {
+            confirmAddCompanyBtn.addEventListener('click', confirmAddCompany);
+        }
+
+        if (newCompanyInput) {
+            newCompanyInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    confirmAddCompany();
+                }
+            });
+            
+            // Update character counter
+            newCompanyInput.addEventListener('input', function() {
+                const counter = document.getElementById('charCount');
+                if (counter) {
+                    counter.textContent = this.value.length;
+                }
+            });
+        }
+
+        if (addCompanyModal) {
+            addCompanyModal.addEventListener('click', function (event) {
+                if (event.target === addCompanyModal) {
+                    closeAddCompanyModal();
+                }
+            });
+        }
+
+        // Handle Escape key for add company modal
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                if (addCompanyModal && !addCompanyModal.classList.contains('hidden')) {
+                    closeAddCompanyModal();
+                } else {
+                    closeInquiryModal();
+                }
             }
         });
 

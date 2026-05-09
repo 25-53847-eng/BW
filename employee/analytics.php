@@ -97,7 +97,17 @@ function isWarrantyReplacementItem($itemName, $groupings) {
 }
 
 // Total delivered to Andison (all records in delivery_records)
-$result = $conn->query("SELECT COUNT(*) as total_orders, COALESCE(SUM(quantity), 0) as total_units FROM delivery_records WHERE sold_to = 'Andison Industrial'$combined_filter");
+// Updated to work with actual data structure where items are delivered to "to Andison Manila"
+$result = $conn->query("
+    SELECT COUNT(*) as total_orders, COALESCE(SUM(quantity), 0) as total_units 
+    FROM delivery_records 
+    WHERE (
+        company_name = 'to Andison Manila' 
+        OR transferred_to = 'to Andison Manila'
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
+    )
+    AND quantity > 0
+");
 if ($result && $row = $result->fetch_assoc()) {
     $totalAndison = intval($row['total_units']);
 }
@@ -108,13 +118,20 @@ if ($result && $row = $result->fetch_assoc()) {
     $companyCount = intval($row['company_count']);
 }
 
-// Monthly data for charts
+// Monthly data for charts - updated for Andison Manila data structure
 $result = $conn->query("
     SELECT delivery_month, 
            COUNT(*) as order_count,
            COALESCE(SUM(quantity), 0) as total_qty
     FROM delivery_records 
-    WHERE sold_to = 'Andison Industrial' AND delivery_month IS NOT NULL AND delivery_month != ''$combined_filter
+    WHERE (
+        company_name = 'to Andison Manila' 
+        OR transferred_to = 'to Andison Manila'
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
+    )
+    AND delivery_month IS NOT NULL 
+    AND delivery_month != ''
+    AND quantity > 0
     GROUP BY delivery_month 
     ORDER BY CASE delivery_month
         WHEN 'January' THEN 1 WHEN 'February' THEN 2 WHEN 'March' THEN 3
@@ -148,22 +165,24 @@ if ($result) {
     }
 }
 
-// Products/Items data - exclude warranty items, orders, and inventory items, and show only significant items
+// Products/Items data - updated for Andison Manila data structure
 $result = $conn->query("
     SELECT item_name, item_code,
            COUNT(*) as order_count,
            COALESCE(SUM(quantity), 0) as total_qty,
            COUNT(DISTINCT company_name) as company_count
     FROM delivery_records 
-    WHERE sold_to = 'Andison Industrial'
-        AND item_name IS NOT NULL
-        AND company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition')
-        AND (sold_to IS NOT NULL AND sold_to != '')
-        AND NOT (LOWER(TRIM(COALESCE(sold_to, ''))) IN ('stock in manila') OR LOWER(TRIM(COALESCE(sold_to, ''))) LIKE '%stock in manila%')
-        AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')
-        $combined_filter
+    WHERE (
+        company_name = 'to Andison Manila' 
+        OR transferred_to = 'to Andison Manila'
+        OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
+    )
+    AND item_name IS NOT NULL
+    AND company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition')
+    AND quantity > 0
+    AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')
     GROUP BY item_name, item_code
-    HAVING COALESCE(SUM(quantity), 0) > 5
+    HAVING COALESCE(SUM(quantity), 0) > 0
     ORDER BY total_qty DESC
     LIMIT 30
 ");

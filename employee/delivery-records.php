@@ -2132,8 +2132,12 @@ if ($unitTypeResult) {
                     </div>
                     <div class="form-group">
                         <label for="add_company_name">Sold To</label>
-                        <input type="text" id="add_company_name" name="company_name" placeholder="e.g., to Andison Manila">
-                        <small class="input-hint">Original delivery recipient (e.g., to Andison Manila)</small>
+                        <select id="add_company_name" name="company_name" required onchange="handleCompanySelection()">
+                            <option value="">Select Company</option>
+                            <option value="__new__" style="font-weight: bold; background-color: #e8f5e9;">+ Add New Company</option>
+                        </select>
+                        <input type="text" id="add_company_name_input" name="company_name_input" placeholder="Enter new company name" style="display: none; margin-top: 5px;">
+                        <small class="input-hint">Original delivery recipient</small>
                     </div>
                     <div class="form-group">
                         <label for="add_delivery_date">Date Delivered</label>
@@ -2939,6 +2943,51 @@ if ($unitTypeResult) {
         });
 
         // Add Record Modal Functions
+        function loadCompanies() {
+            fetch('api/get-clients.php')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.companies) {
+                        const select = document.getElementById('add_company_name');
+                        // Keep the "Select Company" and "Add New Company" options, add companies after
+                        const options = select.querySelectorAll('option');
+                        const firstTwoOptions = Array.from(options).slice(0, 2);
+                        
+                        // Remove all options except first two
+                        while (select.options.length > 2) {
+                            select.remove(2);
+                        }
+                        
+                        // Add companies
+                        data.companies.forEach(company => {
+                            const option = document.createElement('option');
+                            option.value = company;
+                            option.textContent = company;
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => console.error('Error loading companies:', error));
+        }
+
+        function handleCompanySelection() {
+            const select = document.getElementById('add_company_name');
+            const input = document.getElementById('add_company_name_input');
+            
+            if (select.value === '__new__') {
+                // Show input field for new company
+                select.style.display = 'none';
+                input.style.display = 'block';
+                input.focus();
+                input.value = '';
+            } else {
+                // Show dropdown
+                select.style.display = 'block';
+                input.style.display = 'none';
+            }
+        }
+
+        // Add Record Modal Functions
         function openAddModal() {
             document.getElementById('addRecordModal').classList.add('show');
             document.body.classList.add('modal-open');
@@ -2946,6 +2995,12 @@ if ($unitTypeResult) {
             document.getElementById('add_delivery_date').value = new Date().toISOString().split('T')[0];
             document.getElementById('add_highlight_preset').value = '';
             document.getElementById('add_highlight_color').style.display = 'none';
+            // Reset company selection
+            document.getElementById('add_company_name').value = '';
+            document.getElementById('add_company_name').style.display = 'block';
+            document.getElementById('add_company_name_input').style.display = 'none';
+            // Load companies
+            loadCompanies();
         }
 
         function closeAddModal() {
@@ -2953,6 +3008,8 @@ if ($unitTypeResult) {
             document.body.classList.remove('modal-open');
             document.getElementById('addRecordForm').reset();
             document.getElementById('add_highlight_color').style.display = 'none';
+            document.getElementById('add_company_name').style.display = 'block';
+            document.getElementById('add_company_name_input').style.display = 'none';
         }
 
         function toggleAddCustomColor() {
@@ -2993,7 +3050,12 @@ if ($unitTypeResult) {
                 unit_price: parseFloat(document.getElementById('add_unit_price').value) || 0,
                 uom: document.getElementById('add_uom').value,
                 serial_no: document.getElementById('add_serial_no').value,
-                company_name: document.getElementById('add_company_name').value,
+                company_name: (() => {
+                    const select = document.getElementById('add_company_name');
+                    const input = document.getElementById('add_company_name_input');
+                    // If input field is visible (new company), get value from input; otherwise from select
+                    return input.style.display !== 'none' ? input.value : select.value;
+                })(),
                 delivery_date: document.getElementById('add_delivery_date').value,
                 sold_to_month: document.getElementById('add_sold_to_month').value,
                 sold_to_day: parseInt(document.getElementById('add_sold_to_day').value) || 0,

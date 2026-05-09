@@ -1827,11 +1827,6 @@ if ($poItemsQuery) {
                                 <i class="fas fa-times"></i> Clear
                             </a>
                         <?php endif; ?>
-                        <?php if ($dataset_is_enabled && $canAddInventory): ?>
-                        <button type="button" class="btn-add-record" onclick="openEditModal('', '', 0)" style="margin-left: auto;">
-                            <i class="fas fa-plus"></i> Add Inventory
-                        </button>
-                        <?php endif; ?>
                     </form>
                 </div>
             </div>

@@ -994,7 +994,9 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="add_sold_to">Sold To</label>
-                        <input type="text" id="add_sold_to" name="sold_to" placeholder="e.g., ABC Company Ltd">
+                        <select id="add_sold_to" name="sold_to" required>
+                            <option value="">Select Company</option>
+                        </select>
                         <small class="input-hint">Customer/company buying from Andison Manila</small>
                     </div>
                     <div class="form-group">
@@ -1236,7 +1238,9 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="edit_sold_to">Sold To</label>
-                        <input type="text" id="edit_sold_to" name="sold_to" placeholder="e.g., ABC Company Ltd">
+                        <select id="edit_sold_to" name="sold_to" required>
+                            <option value="">Select Company</option>
+                        </select>
                         <small class="input-hint">Customer/company buying from Andison Manila</small>
                     </div>
                     <div class="form-group">
@@ -1327,7 +1331,9 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     </div>
                     <div class="form-group">
                         <label for="sales_sold_to">Customer / Sold To *</label>
-                        <input type="text" id="sales_sold_to" name="sold_to" required placeholder="Company name">
+                        <select id="sales_sold_to" name="sold_to" required>
+                            <option value="">Select Company</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="sales_sold_to_month">Month</label>
@@ -1351,6 +1357,90 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                     <button type="submit" class="btn-submit"><i class="fas fa-save"></i> Record Sale</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Add New Company Modal for Sales Modal -->
+    <div id="addCompanyModalSales" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header" style="margin-bottom:18px;padding-bottom:12px;">
+                <h2><i class="fas fa-building" style="color:#27ae60;margin-right:10px;"></i>Add New Company</h2>
+                <button class="close-btn" onclick="closeAddCompanyModalSales()">&times;</button>
+            </div>
+            <div style="padding: 20px 0;">
+                <label for="newCompanyInputSales" style="display: block; margin-bottom: 10px; color: #333; font-weight: 600; font-size: 13px;">Company Name</label>
+                <input 
+                    id="newCompanyInputSales" 
+                    type="text" 
+                    placeholder="Enter company name" 
+                    autofocus
+                    maxlength="255"
+                    style="width: 100%; padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 8px; font-family: inherit;"
+                >
+                <div style="font-size: 12px; color: #666; text-align: right;">
+                    <span id="charCountSales">0</span>/255
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel-form" onclick="closeAddCompanyModalSales()">Cancel</button>
+                <button type="button" class="btn-submit" onclick="confirmAddCompanySales()" style="background:linear-gradient(135deg,#27ae60,#229954);"><i class="fas fa-plus"></i> Add Company</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Company Modal for Add Record Modal -->
+    <div id="addCompanyModalAdd" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header" style="margin-bottom:18px;padding-bottom:12px;">
+                <h2><i class="fas fa-building" style="color:#2ecc71;margin-right:10px;"></i>Add New Company</h2>
+                <button class="close-btn" onclick="closeAddCompanyModalAdd()">&times;</button>
+            </div>
+            <div style="padding: 20px 0;">
+                <label for="newCompanyInputAdd" style="display: block; margin-bottom: 10px; color: #333; font-weight: 600; font-size: 13px;">Company Name</label>
+                <input 
+                    id="newCompanyInputAdd" 
+                    type="text" 
+                    placeholder="Enter company name" 
+                    autofocus
+                    maxlength="255"
+                    style="width: 100%; padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 8px; font-family: inherit;"
+                >
+                <div style="font-size: 12px; color: #666; text-align: right;">
+                    <span id="charCountAdd">0</span>/255
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel-form" onclick="closeAddCompanyModalAdd()">Cancel</button>
+                <button type="button" class="btn-submit" onclick="confirmAddCompanyAdd()"><i class="fas fa-plus"></i> Add Company</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Company Modal for Edit Record Modal -->
+    <div id="addCompanyModalEdit" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header" style="margin-bottom:18px;padding-bottom:12px;">
+                <h2><i class="fas fa-building" style="color:#f39c12;margin-right:10px;"></i>Add New Company</h2>
+                <button class="close-btn" onclick="closeAddCompanyModalEdit()">&times;</button>
+            </div>
+            <div style="padding: 20px 0;">
+                <label for="newCompanyInputEdit" style="display: block; margin-bottom: 10px; color: #333; font-weight: 600; font-size: 13px;">Company Name</label>
+                <input 
+                    id="newCompanyInputEdit" 
+                    type="text" 
+                    placeholder="Enter company name" 
+                    autofocus
+                    maxlength="255"
+                    style="width: 100%; padding: 12px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 8px; font-family: inherit;"
+                >
+                <div style="font-size: 12px; color: #666; text-align: right;">
+                    <span id="charCountEdit">0</span>/255
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn-cancel-form" onclick="closeAddCompanyModalEdit()">Cancel</button>
+                <button type="button" class="btn-submit" onclick="confirmAddCompanyEdit()"><i class="fas fa-plus"></i> Add Company</button>
+            </div>
         </div>
     </div>
 
@@ -1442,6 +1532,7 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             document.getElementById('add_delivery_date').value = new Date().toISOString().split('T')[0];
             document.getElementById('add_highlight_preset').value = '';
             document.getElementById('add_highlight_color').style.display = 'none';
+            populateSoldToDropdown('add_sold_to');
         }
 
         function closeAddModal() {
@@ -1674,7 +1765,6 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             // Always show "to Andison Manila" in the Transferred field
             document.getElementById('edit_company_name').value  = 'to Andison Manila';
             const actualSoldTo = isRealSoldToValue(record.sold_to) ? record.sold_to : '';
-            document.getElementById('edit_sold_to').value       = actualSoldTo;
             document.getElementById('edit_quantity').value      = record.quantity || '';
             document.getElementById('edit_uom').value           = record.uom || '';
             document.getElementById('edit_notes').value         = record.remarks || '';
@@ -1707,6 +1797,15 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
 
             document.getElementById('editRecordModal').classList.add('show');
             document.body.classList.add('modal-open');
+
+            // Populate dropdown and set current value
+            populateSoldToDropdown('edit_sold_to');
+            setTimeout(() => {
+                const selectElement = document.getElementById('edit_sold_to');
+                if (selectElement) {
+                    selectElement.value = actualSoldTo;
+                }
+            }, 100);
         }
 
         function closeEditModal() {
@@ -1778,24 +1877,43 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             document.getElementById('addSalesModal').classList.add('show');
             document.body.classList.add('modal-open');
             
-            // Populate inventory items dropdown (items with no sold_to)
+            // Populate inventory items dropdown by fetching from API
             const inventorySelect = document.getElementById('sales_inventory_id');
-            inventorySelect.innerHTML = '<option value="">-- Choose an item --</option>';
+            inventorySelect.innerHTML = '<option value="">-- Loading items... --</option>';
+            inventorySelect.disabled = true;
             
-            const inventoryItems = recordsData.filter(r => {
-                const sold_to = String(r.sold_to || '').trim().toLowerCase();
-                return sold_to === '' || sold_to === 'andison manila' || sold_to === 'to andison manila' || sold_to === 'stock in manila' || sold_to === 'andison manila use';
-            });
-            
-            inventoryItems.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.id;
-                option.textContent = `${item.item_code} - ${item.item_name} (Serial: ${item.serial_no}, Qty: ${item.quantity})`;
-                inventorySelect.appendChild(option);
-            });
+            fetch('api/get-andison-inventory.php')
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(result => {
+                    inventorySelect.innerHTML = '<option value="">-- Choose an item --</option>';
+                    
+                    if (result.success && result.items && result.items.length > 0) {
+                        result.items.forEach(item => {
+                            const option = document.createElement('option');
+                            option.value = item.id;
+                            option.textContent = `${item.item_code} - ${item.item_name} (Serial: ${item.serial_no}, Qty: ${item.quantity})`;
+                            inventorySelect.appendChild(option);
+                        });
+                        inventorySelect.disabled = false;
+                    } else {
+                        const emptyOption = document.createElement('option');
+                        emptyOption.disabled = true;
+                        emptyOption.textContent = 'No items in inventory';
+                        inventorySelect.appendChild(emptyOption);
+                        inventorySelect.disabled = true;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching inventory:', err);
+                    inventorySelect.innerHTML = '<option value="">-- Error loading items --</option>';
+                    inventorySelect.disabled = true;
+                });
             
             // Set default date to today
             document.getElementById('sales_delivery_date').value = new Date().toISOString().split('T')[0];
+
+            // Populate sold to dropdown
+            populateSoldToDropdown('sales_sold_to');
         }
 
         function closeAddSalesModal() {
@@ -2014,6 +2132,265 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
                 container.classList.remove('show');
             }
         }
+
+        // ===== ADD NEW COMPANY DROPDOWNS =====
+        async function populateSoldToDropdown(selectId) {
+            const selectElement = document.getElementById(selectId);
+            if (!selectElement) return;
+
+            try {
+                const response = await fetch('api/get-clients.php');
+                const data = await response.json();
+                
+                if (data.success && Array.isArray(data.companies)) {
+                    const currentValue = selectElement.value;
+                    selectElement.innerHTML = '<option value="">Select Company</option>';
+                    
+                    data.companies.forEach(company => {
+                        const option = document.createElement('option');
+                        option.value = company;
+                        option.textContent = company;
+                        selectElement.appendChild(option);
+                    });
+                    
+                    // Add "Add New Company" option
+                    const addNewOption = document.createElement('option');
+                    addNewOption.value = '__ADD_NEW__';
+                    addNewOption.textContent = '+ Add New Company';
+                    addNewOption.style.fontWeight = 'bold';
+                    addNewOption.style.color = '#f39c12';
+                    selectElement.appendChild(addNewOption);
+
+                    // Set change event listener
+                    if (selectId === 'add_sold_to') {
+                        selectElement.addEventListener('change', () => {
+                            if (selectElement.value === '__ADD_NEW__') {
+                                document.getElementById('addCompanyModalAdd').classList.add('show');
+                                document.body.classList.add('modal-open');
+                                const input = document.getElementById('newCompanyInputAdd');
+                                if (input) {
+                                    input.value = '';
+                                    setTimeout(() => input.focus(), 100);
+                                }
+                            }
+                        });
+                    } else if (selectId === 'edit_sold_to') {
+                        selectElement.addEventListener('change', () => {
+                            if (selectElement.value === '__ADD_NEW__') {
+                                document.getElementById('addCompanyModalEdit').classList.add('show');
+                                document.body.classList.add('modal-open');
+                                const input = document.getElementById('newCompanyInputEdit');
+                                if (input) {
+                                    input.value = '';
+                                    setTimeout(() => input.focus(), 100);
+                                }
+                            }
+                        });
+                    } else if (selectId === 'sales_sold_to') {
+                        selectElement.addEventListener('change', () => {
+                            if (selectElement.value === '__ADD_NEW__') {
+                                document.getElementById('addCompanyModalSales').classList.add('show');
+                                document.body.classList.add('modal-open');
+                                const input = document.getElementById('newCompanyInputSales');
+                                if (input) {
+                                    input.value = '';
+                                    setTimeout(() => input.focus(), 100);
+                                }
+                            }
+                        });
+                    }
+
+                    // Restore previous value if it still exists
+                    if (currentValue && currentValue !== '__ADD_NEW__') {
+                        selectElement.value = currentValue;
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching clients:', error);
+            }
+        }
+
+        function closeAddCompanyModalAdd() {
+            document.getElementById('addCompanyModalAdd').classList.remove('show');
+            document.body.classList.remove('modal-open');
+            const selectElement = document.getElementById('add_sold_to');
+            if (selectElement) selectElement.value = '';
+        }
+
+        function closeAddCompanyModalEdit() {
+            document.getElementById('addCompanyModalEdit').classList.remove('show');
+            document.body.classList.remove('modal-open');
+            const selectElement = document.getElementById('edit_sold_to');
+            if (selectElement) selectElement.value = '';
+        }
+
+        function closeAddCompanyModalSales() {
+            document.getElementById('addCompanyModalSales').classList.remove('show');
+            document.body.classList.remove('modal-open');
+            const selectElement = document.getElementById('sales_sold_to');
+            if (selectElement) selectElement.value = '';
+        }
+
+        function confirmAddCompanyAdd() {
+            const selectElement = document.getElementById('add_sold_to');
+            const input = document.getElementById('newCompanyInputAdd');
+            
+            if (!selectElement || !input) return;
+
+            const newCompany = input.value.trim();
+            
+            if (newCompany === '') {
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length < 2) {
+                alert('Company name must be at least 2 characters long.');
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length > 255) {
+                alert('Company name must not exceed 255 characters.');
+                input.focus();
+                return;
+            }
+            
+            const existingOption = Array.from(selectElement.options).find(
+                option => option.value === newCompany && option.value !== '__ADD_NEW__'
+            );
+            
+            if (existingOption) {
+                alert('This company already exists.');
+                input.focus();
+                return;
+            }
+            
+            const newOption = document.createElement('option');
+            newOption.value = newCompany;
+            newOption.textContent = newCompany;
+            
+            const addNewOption = selectElement.querySelector('option[value="__ADD_NEW__"]');
+            selectElement.insertBefore(newOption, addNewOption);
+            
+            selectElement.value = newCompany;
+            closeAddCompanyModalAdd();
+        }
+
+        function confirmAddCompanyEdit() {
+            const selectElement = document.getElementById('edit_sold_to');
+            const input = document.getElementById('newCompanyInputEdit');
+            
+            if (!selectElement || !input) return;
+
+            const newCompany = input.value.trim();
+            
+            if (newCompany === '') {
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length < 2) {
+                alert('Company name must be at least 2 characters long.');
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length > 255) {
+                alert('Company name must not exceed 255 characters.');
+                input.focus();
+                return;
+            }
+            
+            const existingOption = Array.from(selectElement.options).find(
+                option => option.value === newCompany && option.value !== '__ADD_NEW__'
+            );
+            
+            if (existingOption) {
+                alert('This company already exists.');
+                input.focus();
+                return;
+            }
+            
+            const newOption = document.createElement('option');
+            newOption.value = newCompany;
+            newOption.textContent = newCompany;
+            
+            const addNewOption = selectElement.querySelector('option[value="__ADD_NEW__"]');
+            selectElement.insertBefore(newOption, addNewOption);
+            
+            selectElement.value = newCompany;
+            closeAddCompanyModalEdit();
+        }
+
+        function confirmAddCompanySales() {
+            const selectElement = document.getElementById('sales_sold_to');
+            const input = document.getElementById('newCompanyInputSales');
+            
+            if (!selectElement || !input) return;
+
+            const newCompany = input.value.trim();
+            
+            if (newCompany === '') {
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length < 2) {
+                alert('Company name must be at least 2 characters long.');
+                input.focus();
+                return;
+            }
+            
+            if (newCompany.length > 255) {
+                alert('Company name must not exceed 255 characters.');
+                input.focus();
+                return;
+            }
+            
+            const existingOption = Array.from(selectElement.options).find(
+                option => option.value === newCompany && option.value !== '__ADD_NEW__'
+            );
+            
+            if (existingOption) {
+                alert('This company already exists.');
+                input.focus();
+                return;
+            }
+            
+            const newOption = document.createElement('option');
+            newOption.value = newCompany;
+            newOption.textContent = newCompany;
+            
+            const addNewOption = selectElement.querySelector('option[value="__ADD_NEW__"]');
+            selectElement.insertBefore(newOption, addNewOption);
+            
+            selectElement.value = newCompany;
+            closeAddCompanyModalSales();
+        }
+
+        // Character counters
+        document.getElementById('newCompanyInputAdd')?.addEventListener('input', function() {
+            const counter = document.getElementById('charCountAdd');
+            if (counter) counter.textContent = this.value.length;
+        });
+
+        document.getElementById('newCompanyInputEdit')?.addEventListener('input', function() {
+            const counter = document.getElementById('charCountEdit');
+            if (counter) counter.textContent = this.value.length;
+        });
+
+        document.getElementById('newCompanyInputSales')?.addEventListener('input', function() {
+            const counter = document.getElementById('charCountSales');
+            if (counter) counter.textContent = this.value.length;
+        });
+
+        // Initialize dropdowns on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            populateSoldToDropdown('add_sold_to');
+            populateSoldToDropdown('edit_sold_to');
+            populateSoldToDropdown('sales_sold_to');
+        });
     </script>
 
     <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.9.3/dist/dotlottie-wc.js" type="module"></script>

@@ -310,32 +310,46 @@ $sold_vs_delivered = $stats['total_delivered'] > 0 ? round(($stats['total_sold']
 $sales_insights = [];
 if ($sold_vs_delivered > 80) {
     $sales_insights[] = "Excellent conversion! {$sold_vs_delivered}% of delivered items sold";
+    $sales_insights[] = "💡 Keep momentum - focus on scaling successful client relationships";
 } elseif ($sold_vs_delivered > 50) {
     $sales_insights[] = "Good conversion at {$sold_vs_delivered}% sell-through rate";
+    $sales_insights[] = "💡 Opportunity: Target dormant inventory (unsold items) with promotional offers";
+    $sales_insights[] = "💡 Reach out to past clients for repeat business - they're familiar with products";
 } else {
     $sales_insights[] = "Sell-through rate is {$sold_vs_delivered}% - room for improvement";
+    $sales_insights[] = "💡 Action item: Create promotional bundles to increase sell-through rate";
+    $sales_insights[] = "💡 Analyze unsold inventory - consider price adjustments or product positioning";
+    $sales_insights[] = "💡 Expand client base - identify new markets or vertical segments";
 }
 
-// Monthly comparison insights
+// Monthly comparison insights with recommendations
 $monthly_insights = [];
 if ($best_month) {
     $monthly_insights[] = "{$best_month} was the best month with " . number_format($best_value) . " units";
+    $monthly_insights[] = "💡 Analyze {$best_month} success - what drove performance? Replicate these tactics";
 }
 if ($worst_month && $worst_month != $best_month) {
     $monthly_insights[] = "{$worst_month} had the lowest at " . number_format($worst_value) . " units";
+    $monthly_insights[] = "💡 Plan campaigns for {$worst_month} next year - prepare promotions in advance";
 }
 $monthly_insights[] = "Average monthly delivery is " . number_format($avg_monthly) . " units";
+$monthly_insights[] = "💡 Set quarterly targets based on average - aim to exceed peak months consistently";
 
-// Client insights
+// Client insights with recommendations
 $client_insights = [];
 if (count($top_clients) > 0) {
     $top_client = $top_clients[0];
     $client_insights[] = "{$top_client['company_name']} is the top client with " . number_format($top_client['total_quantity']) . " units";
+    $client_insights[] = "💡 VIP Strategy: Offer loyalty benefits to {$top_client['company_name']} to ensure retention";
     if (count($top_clients) >= 3) {
         $top3_total = $top_clients[0]['total_quantity'] + $top_clients[1]['total_quantity'] + $top_clients[2]['total_quantity'];
         $top3_percent = $stats['total_delivered'] > 0 ? round(($top3_total / $stats['total_delivered']) * 100) : 0;
         $client_insights[] = "Top 3 clients account for {$top3_percent}% of total deliveries";
+        $client_insights[] = "💡 Risk Alert: Diversify client base - reduce dependency on top 3 clients";
+        $client_insights[] = "💡 Growth Strategy: Target similar companies to the top 3 (same industry, size)";
     }
+} else {
+    $client_insights[] = "💡 No significant clients yet - focus on acquiring anchor customers";
 }
 
 // Trend insights
@@ -351,25 +365,35 @@ if ($prev_month_value > 0) {
     $change = round((($current_month_value - $prev_month_value) / $prev_month_value) * 100);
     if ($change > 0) {
         $trend_insights[] = "Sales increased by {$change}% from {$prev_month_name}";
+        $trend_insights[] = "💡 Momentum: Double down on what's working - analyze successful campaigns";
     } elseif ($change < 0) {
         $trend_insights[] = "Sales decreased by " . abs($change) . "% from {$prev_month_name}";
+        $trend_insights[] = "💡 Recovery Plan: Identify what changed - lost clients? Seasonal trend?";
+        $trend_insights[] = "💡 Quick Win: Launch flash sale or loyalty program to regain momentum";
     } else {
         $trend_insights[] = "Sales stable compared to {$prev_month_name}";
+        $trend_insights[] = "💡 Stabilization: Maintain current efforts and test new marketing channels";
     }
 }
 $trend_insights[] = "{$current_month_name} has " . number_format($current_month_value) . " units so far";
+if ($current_month_value < $avg_monthly) {
+    $gap = $avg_monthly - $current_month_value;
+    $trend_insights[] = "💡 Target: Need " . number_format($gap) . " more units to match monthly average";
+}
 
-// Group A insights (Top 5 products)
+// Group A insights (Top 5 products) with recommendations
 $groupA_insights = [];
 if (count($top_products) >= 1) {
     $groupA_products = array_slice($top_products, 0, 5);
     $top_product = $groupA_products[0];
     $groupA_insights[] = "{$top_product['item_code']} is the #1 product with " . number_format($top_product['total']) . " units";
+    $groupA_insights[] = "💡 Keep Stock: Prioritize inventory for {$top_product['item_code']} to prevent stockouts";
     if (count($groupA_products) >= 3) {
         $top3_sum = array_sum(array_column(array_slice($groupA_products, 0, 3), 'total'));
         $total_products_sum = array_sum(array_column($top_products, 'total'));
         $top3_pct = $total_products_sum > 0 ? round(($top3_sum / $total_products_sum) * 100) : 0;
         $groupA_insights[] = "Top 3 products make up {$top3_pct}% of product sales";
+        $groupA_insights[] = "💡 Bundling: Create packages pairing top sellers with slow-movers";
     }
 }
 

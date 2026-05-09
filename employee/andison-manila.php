@@ -1778,21 +1778,37 @@ $totalSold = count(array_filter($delivery_records, function($r) use ($isRealSold
             document.getElementById('addSalesModal').classList.add('show');
             document.body.classList.add('modal-open');
             
-            // Populate inventory items dropdown (items with no sold_to)
+            // Populate inventory items dropdown by fetching from API
             const inventorySelect = document.getElementById('sales_inventory_id');
-            inventorySelect.innerHTML = '<option value="">-- Choose an item --</option>';
+            inventorySelect.innerHTML = '<option value="">-- Loading items... --</option>';
+            inventorySelect.disabled = true;
             
-            const inventoryItems = recordsData.filter(r => {
-                const sold_to = String(r.sold_to || '').trim().toLowerCase();
-                return sold_to === '' || sold_to === 'andison manila' || sold_to === 'to andison manila' || sold_to === 'stock in manila' || sold_to === 'andison manila use';
-            });
-            
-            inventoryItems.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.id;
-                option.textContent = `${item.item_code} - ${item.item_name} (Serial: ${item.serial_no}, Qty: ${item.quantity})`;
-                inventorySelect.appendChild(option);
-            });
+            fetch('api/get-andison-inventory.php')
+                .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+                .then(result => {
+                    inventorySelect.innerHTML = '<option value="">-- Choose an item --</option>';
+                    
+                    if (result.success && result.items && result.items.length > 0) {
+                        result.items.forEach(item => {
+                            const option = document.createElement('option');
+                            option.value = item.id;
+                            option.textContent = `${item.item_code} - ${item.item_name} (Serial: ${item.serial_no}, Qty: ${item.quantity})`;
+                            inventorySelect.appendChild(option);
+                        });
+                        inventorySelect.disabled = false;
+                    } else {
+                        const emptyOption = document.createElement('option');
+                        emptyOption.disabled = true;
+                        emptyOption.textContent = 'No items in inventory';
+                        inventorySelect.appendChild(emptyOption);
+                        inventorySelect.disabled = true;
+                    }
+                })
+                .catch(err => {
+                    console.error('Error fetching inventory:', err);
+                    inventorySelect.innerHTML = '<option value="">-- Error loading items --</option>';
+                    inventorySelect.disabled = true;
+                });
             
             // Set default date to today
             document.getElementById('sales_delivery_date').value = new Date().toISOString().split('T')[0];
