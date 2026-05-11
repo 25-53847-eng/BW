@@ -174,6 +174,20 @@ function inferGroupingFromText($text) {
     return '';
 }
 
+// Detect explicit warranty labels from source columns (e.g., "Warranty Replacement", "Warranty Items").
+function hasWarrantyReplacementLabel(string $text): bool {
+    $value = strtolower(trim($text));
+    if ($value === '') {
+        return false;
+    }
+
+    return strpos($value, 'warranty replacement') !== false
+        || strpos($value, 'warranty replacemer') !== false
+        || strpos($value, 'warranty item') !== false
+        || strpos($value, 'warranty items') !== false
+        || preg_match('/\bwarranty\b/', $value) === 1;
+}
+
 function inferGroupingFromColor($hexColor) {
     $hex = strtoupper(trim((string) $hexColor));
     if ($hex === '') return '';
@@ -356,6 +370,7 @@ function ensureWarrantyReplacementsTable($conn, bool $isMysql): void {
             warranty_flag TINYINT(1) DEFAULT 1,
             warranty_date DATE DEFAULT NULL,
             red_text_detected TINYINT(1) DEFAULT 1,
+            owner_user_id INT(11) DEFAULT NULL COMMENT 'User who uploaded/created this warranty record',
             dataset_name VARCHAR(50) DEFAULT NULL,
             highlight_color VARCHAR(20) DEFAULT NULL,
             cell_styles LONGTEXT DEFAULT NULL,
@@ -366,6 +381,7 @@ function ensureWarrantyReplacementsTable($conn, bool $isMysql): void {
             KEY `idx_warranty_date` (`warranty_date`),
             KEY `idx_item_code` (`item_code`),
             KEY `idx_company_name` (`company_name`),
+            KEY `idx_owner_user_id` (`owner_user_id`),
             CONSTRAINT `fk_warranty_delivery_record` FOREIGN KEY (`delivery_record_id`) 
                 REFERENCES `delivery_records` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
@@ -392,6 +408,7 @@ function ensureWarrantyReplacementsTable($conn, bool $isMysql): void {
             warranty_flag INTEGER DEFAULT 1,
             warranty_date DATE DEFAULT NULL,
             red_text_detected INTEGER DEFAULT 1,
+            owner_user_id INTEGER DEFAULT NULL,
             dataset_name VARCHAR(50) DEFAULT NULL,
             highlight_color VARCHAR(20) DEFAULT NULL,
             cell_styles TEXT DEFAULT NULL,
@@ -579,6 +596,15 @@ $column_mappings = [
     'category' => 'groupings',
     'Grouping' => 'groupings',
     'Group' => 'groupings',
+    'Warranty Replacement' => 'groupings',
+    'WARRANTY REPLACEMENT' => 'groupings',
+    'warranty replacement' => 'groupings',
+    'Warranty Items' => 'groupings',
+    'WARRANTY ITEMS' => 'groupings',
+    'warranty items' => 'groupings',
+    'Warranty Item' => 'groupings',
+    'WARRANTY ITEM' => 'groupings',
+    'warranty item' => 'groupings',
     'By Color' => 'groupings',
     'BY COLOR' => 'groupings',
     'by color' => 'groupings',
@@ -659,6 +685,26 @@ try {
 
     ensureHighlightMemoryTable($conn, $isMysql);
     ensureWarrantyReplacementsTable($conn, $isMysql);
+
+    // Ensure warranty_replacements table has owner_user_id column (migration for existing tables)
+    if ($isMysql) {
+        $ownerUserIdCol = $conn->query("SHOW COLUMNS FROM warranty_replacements LIKE 'owner_user_id'");
+        if (!$ownerUserIdCol || $ownerUserIdCol->num_rows === 0) {
+            $conn->query("ALTER TABLE warranty_replacements ADD COLUMN owner_user_id INT(11) DEFAULT NULL COMMENT 'User who uploaded/created this warranty record'");
+            $conn->query("CREATE INDEX idx_owner_user_id ON warranty_replacements (owner_user_id)");
+        }
+    } else {
+        $hasOwnerUserId = false;
+        $chkOwnerUserId = $conn->query('PRAGMA table_info(warranty_replacements)');
+        if ($chkOwnerUserId) {
+            while ($r = $chkOwnerUserId->fetch_assoc()) {
+                if (strtolower($r['name']) === 'owner_user_id') { $hasOwnerUserId = true; break; }
+            }
+        }
+        if (!$hasOwnerUserId) {
+            $conn->query('ALTER TABLE warranty_replacements ADD COLUMN owner_user_id INTEGER DEFAULT NULL');
+        }
+    }
 
     // Detect all columns from the uploaded data and auto-create missing ones
     $all_columns_in_data = [];
@@ -1121,8 +1167,19 @@ try {
             // Don't set default delivery month/day - only store what's in the Excel
             // Don't auto-fill quantity - if Excel has no quantity, leave it as 0/empty
 
-            // Check if this row is marked as warranty (red text detected)
-            $is_warranty_row = isset($warranty_rows_flipped[$index]);
+            // Check if this row is marked as warranty by red text OR explicit warranty labels.
+            $is_warranty_by_red = isset($warranty_rows_flipped[$index]);
+            $warrantyIndicatorText = implode(' ', [
+                $groupings,
+                $status,
+                $notes,
+                $inventory_marker,
+                $sold_to,
+                $item_name,
+            ]);
+            $is_warranty_by_label = hasWarrantyReplacementLabel($warrantyIndicatorText);
+            $is_warranty_row = $is_warranty_by_red || $is_warranty_by_label;
+            $red_text_detected = $is_warranty_by_red ? 1 : 0;
             
             if (!$is_warranty_row) {
                 // SKIP warranty rows from delivery_records - they go directly to warranty_replacements

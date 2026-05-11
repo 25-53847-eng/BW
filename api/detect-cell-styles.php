@@ -59,6 +59,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 // Load PhpSpreadsheet - ensure vendor doesn't output anything
 require_once __DIR__ . '/../vendor/autoload.php';
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 
 if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {

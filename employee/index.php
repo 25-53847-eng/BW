@@ -33,6 +33,16 @@ if ($selected_dataset === '') {
     $selected_dataset = null;
 }
 
+// Get selected year from GET parameter or session
+if (isset($_GET['year'])) {
+    $selected_year = intval($_GET['year']);
+    if ($selected_year > 1900 && $selected_year < 2100) {
+        $_SESSION['active_year'] = $selected_year;
+    }
+} else {
+    $selected_year = isset($_SESSION['active_year']) ? $_SESSION['active_year'] : null;
+}
+
 // Build dataset filter for queries
 // Employees see all company data (not filtered by owner_user_id)
 $dataset_filter = ' AND company_name != ?';
@@ -40,6 +50,10 @@ $dataset_filter_params = ['Stock Addition'];
 if (!empty($selected_dataset)) {
     $dataset_filter .= ' AND dataset_name = ?';
     $dataset_filter_params[] = $selected_dataset;
+}
+if (!empty($selected_year)) {
+    $dataset_filter .= ' AND YEAR(delivery_date) = ?';
+    $dataset_filter_params[] = $selected_year;
 }
 
 // Get dashboard statistics
@@ -62,8 +76,8 @@ function bindParamsAndExecute(&$stmt, $params) {
     $stmt->execute();
 }
 
-// Count total delivered (ONLY 1A, 2A, 4A units)
-$sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE status = 'Delivered' AND unit_type IN ('1a', '2a', '4a')" . $dataset_filter;
+// Count total delivered (all units - unit_type column may be empty)
+$sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE status = 'Delivered'" . $dataset_filter;
 $stmt = $conn->prepare($sql);
 if ($stmt) {
     bindParamsAndExecute($stmt, $dataset_filter_params);
@@ -103,11 +117,24 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Count unique client companies (using shared helper for consistency)
-$stats['total_companies'] = countClientCompanies($conn, $dataset_filter, $dataset_filter_params);
+// Count unique client companies - include ALL except internal markers and corrupted entries
+// Exclude: Stock Addition, Orders, Delivery Records (internal markers)
+// Also exclude: to Andison Manila (incomplete), Zamora display (duplicate variant)
+$sql = "SELECT COUNT(DISTINCT company_name) as total FROM delivery_records 
+        WHERE company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'to Andison Manila', 'Zamora display') 
+        AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    bindParamsAndExecute($stmt, $dataset_filter_params);
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $stats['total_companies'] = intval($row['total']);
+    }
+    $stmt->close();
+}
 
-// Count unique item codes (models)
-$sql = "SELECT COUNT(DISTINCT item_code) as total FROM delivery_records WHERE 1=1" . $dataset_filter;
+// Count unique item codes (models) - exclude UNKNOWN items
+$sql = "SELECT COUNT(DISTINCT item_code) as total FROM delivery_records WHERE item_code NOT LIKE 'UNKNOWN%'" . $dataset_filter;
 $stmt = $conn->prepare($sql);
 if ($stmt) {
     bindParamsAndExecute($stmt, $dataset_filter_params);
@@ -403,10 +430,10 @@ $company_trend_percent = 0;
 $company_trend_direction = 'neutral';
 
 $sql_current = "
-    SELECT COUNT(DISTINCT sold_to) as count
+    SELECT COUNT(DISTINCT company_name) as count
     FROM delivery_records
-    WHERE delivery_month = ? AND sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != ''
-      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter;
+    WHERE delivery_month = ? AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'Andison Manila') 
+      AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
 $stmt = $conn->prepare($sql_current);
 if ($stmt) {
     $params_with_month = array_merge([$current_month_name], $dataset_filter_params);
@@ -421,10 +448,10 @@ if ($stmt) {
 }
 
 $sql_prev = "
-    SELECT COUNT(DISTINCT sold_to) as count
+    SELECT COUNT(DISTINCT company_name) as count
     FROM delivery_records
-    WHERE delivery_month = ? AND sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != ''
-      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter;
+    WHERE delivery_month = ? AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'Andison Manila')
+      AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
 $stmt = $conn->prepare($sql_prev);
 if ($stmt) {
     $params_with_month = array_merge([$prev_month_name], $dataset_filter_params);
@@ -629,6 +656,34 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
         </div>
         <?php endif; ?>
             <div class="industrial-pattern"></div>
+        </div>
+
+        <!-- FILTER SECTION -->
+        <div style="background: linear-gradient(135deg, #1e2a38 0%, #2a3f5f 100%); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 20px; margin-bottom: 28px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+                <label style="font-size: 14px; font-weight: 600; color: #e0e0e0; margin: 0; white-space: nowrap;">
+                    <i class="fas fa-calendar" style="color: #f4d03f; margin-right: 8px;"></i>Filter by Year:
+                </label>
+                <select id="yearFilterMain" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #4a5f7a; background: #1e2a38; font-size: 13px; font-weight: 500; cursor: pointer; color: #e0e0e0; transition: border-color 0.2s;" onchange="filterByYear(this.value)">
+                    <option value="">All Years</option>
+                    <?php
+                    // Get available years from database
+                    $yearResult = $conn->query("SELECT DISTINCT YEAR(delivery_date) as year FROM delivery_records WHERE delivery_date IS NOT NULL AND company_name != 'Stock Addition' ORDER BY year DESC");
+                    if ($yearResult) {
+                        while ($yearRow = $yearResult->fetch_assoc()) {
+                            $year = intval($yearRow['year']);
+                            $selected = ($selected_year === $year) ? 'selected' : '';
+                            echo "<option value=\"{$year}\" {$selected}>{$year}</option>";
+                        }
+                    }
+                    ?>
+                </select>
+            </div>
+            <?php if (!empty($selected_year)): ?>
+            <button style="padding: 8px 16px; border-radius: 6px; border: 1px solid #f4d03f; background: transparent; color: #f4d03f; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="filterByYear('')">
+                <i class="fas fa-times" style="margin-right: 6px;"></i>Clear Filter
+            </button>
+            <?php endif; ?>
         </div>
 
         <!-- KPI METRICS SECTION -->
@@ -1078,6 +1133,17 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
         // Navigation function
         function goToReports() {
             window.location.href = 'reports.php';
+        }
+
+        // Filter by year function
+        function filterByYear(year) {
+            const params = new URLSearchParams(window.location.search);
+            if (year) {
+                params.set('year', year);
+            } else {
+                params.delete('year');
+            }
+            window.location.search = params.toString();
         }
 
         function closeAllMetricInsights() {

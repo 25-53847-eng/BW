@@ -39,6 +39,7 @@ try {
         `warranty_flag` TINYINT(1) DEFAULT 1 COMMENT 'Flagged as warranty (1=yes, 0=no)',
         `warranty_date` DATE DEFAULT NULL COMMENT 'Date flagged as warranty',
         `red_text_detected` TINYINT(1) DEFAULT 1 COMMENT 'Row had red text during import',
+        `owner_user_id` INT(11) DEFAULT NULL COMMENT 'User who uploaded/created this warranty record',
         `dataset_name` VARCHAR(50) DEFAULT NULL,
         `highlight_color` VARCHAR(20) DEFAULT NULL,
         `cell_styles` LONGTEXT DEFAULT NULL,
@@ -54,6 +55,7 @@ try {
         KEY `idx_warranty_flag` (`warranty_flag`),
         KEY `idx_warranty_date` (`warranty_date`),
         KEY `idx_delivery_record_id` (`delivery_record_id`),
+        KEY `idx_owner_user_id` (`owner_user_id`),
         KEY `idx_created_at` (`created_at`),
 
         -- Foreign key (optional, can be enabled if needed)

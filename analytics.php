@@ -106,7 +106,7 @@ $result = $conn->query("
         OR transferred_to = 'to Andison Manila'
         OR LOWER(TRIM(COALESCE(sold_to, ''))) IN ('andison manila', 'to andison manila', 'stock in manila', 'andison manila use')
     )
-    AND quantity > 0
+    AND quantity > 0$combined_filter
 ");
 if ($result && $row = $result->fetch_assoc()) {
     $totalAndison = intval($row['total_units']);
@@ -131,7 +131,7 @@ $result = $conn->query("
     )
     AND delivery_month IS NOT NULL 
     AND delivery_month != ''
-    AND quantity > 0
+    AND quantity > 0$combined_filter
     GROUP BY delivery_month 
     ORDER BY CASE delivery_month
         WHEN 'January' THEN 1 WHEN 'February' THEN 2 WHEN 'March' THEN 3
@@ -180,7 +180,7 @@ $result = $conn->query("
     AND item_name IS NOT NULL
     AND company_name NOT IN ('Orders', 'Inquiry', 'Stock Addition')
     AND quantity > 0
-    AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')
+    AND NOT (LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%warranty replacement%' OR LOWER(TRIM(COALESCE(groupings, ''))) LIKE '%3a%')$combined_filter
     GROUP BY item_name, item_code
     HAVING COALESCE(SUM(quantity), 0) > 0
     ORDER BY total_qty DESC
