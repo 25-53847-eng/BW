@@ -71,9 +71,11 @@ try {
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN po_status VARCHAR(50) DEFAULT 'No PO'");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN groupings VARCHAR(50) DEFAULT NULL");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN dataset_name VARCHAR(50) DEFAULT NULL");
+    safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN unit_type VARCHAR(10) DEFAULT NULL");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN owner_user_id INT DEFAULT NULL");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD COLUMN record_type VARCHAR(50) DEFAULT 'delivery'");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD INDEX idx_owner_user_id (owner_user_id)");
+    safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD INDEX idx_unit_type (unit_type)");
     safeSchemaUpgrade($conn, "ALTER TABLE {$recordsTable} ADD INDEX idx_record_type (record_type)");
 
     $conn->query("CREATE TABLE IF NOT EXISTS users (

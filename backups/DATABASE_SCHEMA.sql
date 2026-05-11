@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS `delivery_records` (
   `groupings` VARCHAR(10) DEFAULT NULL COMMENT 'Product groupings (1A, 1B, 2A, 2B, 3A, 4A)',
   `inventory_status` VARCHAR(50) DEFAULT NULL COMMENT 'Inventory classification: INVENTORY, Stock in Manila, or NULL for sales',
   `dataset_name` VARCHAR(255) DEFAULT NULL COMMENT 'Dataset name for categorization',
+  `unit_type` VARCHAR(10) DEFAULT NULL COMMENT 'Unit Type (1a, 1b, 2a, 2b, 3a, 4a)',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation timestamp',
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Record last update timestamp',
   
@@ -43,6 +44,7 @@ CREATE TABLE IF NOT EXISTS `delivery_records` (
   KEY `idx_company_name` (`company_name`),
   KEY `idx_status` (`status`),
   KEY `idx_po_status` (`po_status`),
+  KEY `idx_unit_type` (`unit_type`),
   KEY `idx_created_at` (`created_at`),
   
   -- Unique constraint to prevent duplicate entries

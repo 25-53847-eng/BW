@@ -190,7 +190,8 @@ CREATE TABLE `delivery_records` (
   `box` varchar(255) DEFAULT NULL,
   `items` varchar(255) DEFAULT NULL,
   `inventory` varchar(255) DEFAULT NULL,
-  `owner_user_id` int(11) DEFAULT NULL
+  `owner_user_id` int(11) DEFAULT NULL,
+  `unit_type` varchar(10) DEFAULT NULL COMMENT 'Unit Type (1a, 1b, 2a, 2b, 3a, 4a)'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Stores delivery records for BW Gas Detector products';
 
 --
@@ -1041,6 +1042,7 @@ ALTER TABLE `delivery_records`
   ADD KEY `idx_item_code` (`item_code`),
   ADD KEY `idx_company_name` (`company_name`),
   ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_unit_type` (`unit_type`),
   ADD KEY `idx_created_at` (`created_at`),
   ADD KEY `idx_owner_user_id` (`owner_user_id`);
 
