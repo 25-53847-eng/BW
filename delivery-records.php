@@ -3842,9 +3842,12 @@ if ($unitTypeResult) {
                 || selectedUnitTypes.length === availableUnitTypes.length;
             const hasSearch = query !== '';
 
+            // Track which groups have matching items for category header visibility
+            const groupsWithMatches = new Set();
+
             // Show/hide rows based on filter
             tableRows.forEach(row => {
-                // Skip rows with colspan (empty state)
+                // Skip rows with colspan (empty state, category headers)
                 if (row.querySelector('td[colspan]')) return;
 
                 // Check unit type filter
@@ -3856,8 +3859,22 @@ if ($unitTypeResult) {
                     unitTypeMatched = selectedUnitTypes.some(ut => ut.toLowerCase() === rowUnitType);
                 }
 
+                // Search on textContent + data attributes (especially serial_no)
                 const rowText = row.textContent.toLowerCase();
-                const searchMatched = !hasSearch || rowText.includes(query);
+                const serialNo = (row.getAttribute('data-serial-no') || '').toLowerCase();
+                const invoiceNo = (row.getAttribute('data-invoice-no') || '').toLowerCase();
+                const itemCode = (row.getAttribute('data-item-code') || '').toLowerCase();
+                const itemName = (row.getAttribute('data-item-name') || '').toLowerCase();
+                const soldTo = (row.getAttribute('data-sold-to') || '').toLowerCase();
+                
+                const searchMatched = !hasSearch || 
+                    rowText.includes(query) ||
+                    serialNo.includes(query) ||
+                    invoiceNo.includes(query) ||
+                    itemCode.includes(query) ||
+                    itemName.includes(query) ||
+                    soldTo.includes(query);
+                
                 const matched = unitTypeMatched && searchMatched;
 
                 if (showAllUnitType && !hasSearch) {
@@ -3872,12 +3889,30 @@ if ($unitTypeResult) {
                     if (matched) {
                         row.classList.add('filtered-match');
                         row.style.display = 'table-row';
+                        // Track that this group has matches
+                        const groupId = row.getAttribute('data-group-id');
+                        if (groupId) groupsWithMatches.add(groupId);
                     } else {
                         row.classList.remove('filtered-match');
                         row.style.display = 'none';
                     }
                 }
             });
+
+            // Show/hide category headers based on whether they have matching items
+            if (hasSearch || !showAllUnitType) {
+                const categoryHeaders = document.querySelectorAll('tr.invoice-group-header');
+                categoryHeaders.forEach(header => {
+                    const groupId = header.getAttribute('data-group-id');
+                    if (groupsWithMatches.has(groupId)) {
+                        header.style.display = 'table-row';
+                        header.classList.remove('hidden-row');
+                    } else {
+                        header.style.display = 'none';
+                        header.classList.add('hidden-row');
+                    }
+                });
+            }
 
             // Hide pagination controls while filtering
             if (loadMoreContainer) {

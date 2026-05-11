@@ -1102,15 +1102,29 @@ try {
             // Check if this row is marked as warranty (red text detected)
             // Check if this row is marked as warranty by red text OR explicit warranty labels.
             $is_warranty_by_red = isset($warranty_rows_flipped[$index]);
+            
+            // PRIORITY: Check if inventory_marker explicitly says "WARRANTY REPLACEMENT"
+            $is_warranty_by_inventory_marker = false;
+            if (!empty($inventory_marker)) {
+                $marker_lower = strtolower(trim($inventory_marker));
+                if (strpos($marker_lower, 'warranty replacement') !== false || 
+                    strpos($marker_lower, 'warranty replacemer') !== false ||
+                    strpos($marker_lower, 'warranty item') !== false ||
+                    strpos($marker_lower, 'warranty') !== false) {
+                    $is_warranty_by_inventory_marker = true;
+                }
+            }
+            
             $warrantyIndicatorText = implode(' ', [
                 $groupings,
                 $status,
                 $notes,
+                $inventory_marker,
                 $sold_to,
                 $item_name,
             ]);
             $is_warranty_by_label = hasWarrantyReplacementLabel($warrantyIndicatorText);
-            $is_warranty_row = $is_warranty_by_red || $is_warranty_by_label;
+            $is_warranty_row = $is_warranty_by_red || $is_warranty_by_label || $is_warranty_by_inventory_marker;
             $red_text_detected = $is_warranty_by_red ? 1 : 0;
             
             if (!$is_warranty_row) {

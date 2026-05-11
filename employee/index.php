@@ -35,11 +35,22 @@ if ($selected_dataset === '') {
 
 // Get selected year from GET parameter or session
 if (isset($_GET['year'])) {
-    $selected_year = intval($_GET['year']);
-    if ($selected_year > 1900 && $selected_year < 2100) {
-        $_SESSION['active_year'] = $selected_year;
+    // Check if year parameter is empty string (All Years)
+    if ($_GET['year'] === '') {
+        unset($_SESSION['active_year']);
+        $selected_year = null;
+    } else {
+        $selected_year = intval($_GET['year']);
+        if ($selected_year > 1900 && $selected_year < 2100) {
+            $_SESSION['active_year'] = $selected_year;
+        } else {
+            // Invalid year - clear and reset to null
+            unset($_SESSION['active_year']);
+            $selected_year = null;
+        }
     }
 } else {
+    // No year parameter in GET - use session value if exists
     $selected_year = isset($_SESSION['active_year']) ? $_SESSION['active_year'] : null;
 }
 
@@ -117,15 +128,23 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Count unique client companies - include ALL except internal markers and corrupted entries
-// Exclude: Stock Addition, Orders, Delivery Records (internal markers)
-// Also exclude: to Andison Manila (incomplete), Zamora display (duplicate variant)
-$sql = "SELECT COUNT(DISTINCT company_name) as total FROM delivery_records 
-        WHERE company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'to Andison Manila', 'Zamora display') 
-        AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
+// Count unique client companies - join with approved_companies table to only count valid clients
+// Build filter without the Stock Addition check (not needed since approved_companies is our whitelist)
+$company_filter = '';
+$company_filter_params = [];
+if (!empty($selected_dataset)) {
+    $company_filter .= ' AND dr.dataset_name = ?';
+    $company_filter_params[] = $selected_dataset;
+}
+if (!empty($selected_year)) {
+    $company_filter .= ' AND YEAR(dr.delivery_date) = ?';
+    $company_filter_params[] = $selected_year;
+}
+$sql = "SELECT COUNT(DISTINCT dr.company_name) as total FROM delivery_records dr
+        INNER JOIN approved_companies ac ON dr.company_name = ac.company_name" . $company_filter;
 $stmt = $conn->prepare($sql);
 if ($stmt) {
-    bindParamsAndExecute($stmt, $dataset_filter_params);
+    bindParamsAndExecute($stmt, $company_filter_params);
     $result = $stmt->get_result();
     if ($row = $result->fetch_assoc()) {
         $stats['total_companies'] = intval($row['total']);
@@ -665,7 +684,7 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
                     <i class="fas fa-calendar" style="color: #f4d03f; margin-right: 8px;"></i>Filter by Year:
                 </label>
                 <select id="yearFilterMain" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #4a5f7a; background: #1e2a38; font-size: 13px; font-weight: 500; cursor: pointer; color: #e0e0e0; transition: border-color 0.2s;" onchange="filterByYear(this.value)">
-                    <option value="">All Years</option>
+                    <option value="" <?php echo (empty($selected_year)) ? 'selected' : ''; ?>>All Years</option>
                     <?php
                     // Get available years from database
                     $yearResult = $conn->query("SELECT DISTINCT YEAR(delivery_date) as year FROM delivery_records WHERE delivery_date IS NOT NULL AND company_name != 'Stock Addition' ORDER BY year DESC");
@@ -1138,7 +1157,10 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
         // Filter by year function
         function filterByYear(year) {
             const params = new URLSearchParams(window.location.search);
-            if (year) {
+            if (year === '' || year === null || year === undefined) {
+                // Clear the filter - set year to empty string explicitly
+                params.set('year', '');
+            } else if (year) {
                 params.set('year', year);
             } else {
                 params.delete('year');

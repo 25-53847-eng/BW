@@ -1738,7 +1738,8 @@ if ($conn) {
             const rows = [];
             for (let i = 1; i < jsonData.length; i++) {
                 const rowData = jsonData[i];
-                if (!rowData || rowData.length === 0) continue;
+                // REMOVED: early skip of empty rows - let backend validation handle row filtering
+                // This ensures ALL rows from Excel are sent to the import API
                 
                 const row = {};
                 const cellStyles = {};
@@ -1767,9 +1768,10 @@ if ($conn) {
                     row.highlight_color = rowHighlightColor;
                 }
                 
-                if (Object.values(row).some(v => v !== '')) {
-                    rows.push(row);
-                }
+                // REMOVED: filter that only kept rows with non-empty values
+                // Instead: push ALL rows to preserve row count from Excel
+                // Backend import-data.php has proper validation for empty rows
+                rows.push(row);
             }
             return rows;
         }
@@ -2547,7 +2549,7 @@ if ($conn) {
                             
                             for (let i = 1; i < jsonData.length; i++) {
                                 const rowData = jsonData[i];
-                                if (!rowData || rowData.length === 0) continue;
+                                // REMOVED: early skip of empty rows - let backend validation handle
                                 
                                 const row = {};
                                 headers.forEach((header, index) => {
@@ -2558,9 +2560,9 @@ if ($conn) {
                                     row[header] = value !== undefined ? value : '';
                                 });
                                 
-                                if (Object.values(row).some(v => v !== '')) {
-                                    rows.push(row);
-                                }
+                                // REMOVED: filter that only kept rows with non-empty values
+                                // Push ALL rows to preserve row count from Excel
+                                rows.push(row);
                             }
                             
                             resolve(rows);

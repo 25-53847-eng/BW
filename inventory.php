@@ -111,7 +111,7 @@ $filterStock = isset($_GET['filter']) ? $_GET['filter'] : 'all'; // all, critica
 $searchFilter = '';
 if ($searchItem) {
     $searchItemEscape = $conn->real_escape_string($searchItem);
-    $searchFilter = " AND (item_code LIKE '%{$searchItemEscape}%' OR item_name LIKE '%{$searchItemEscape}%')";
+    $searchFilter = " AND (item_code LIKE '%{$searchItemEscape}%' OR item_name LIKE '%{$searchItemEscape}%' OR serial_no LIKE '%{$searchItemEscape}%')";
 }
 
 $owner_user_id = intval($_SESSION['user_id'] ?? 0);
@@ -1818,7 +1818,7 @@ if ($poItemsQuery) {
                         <input 
                             type="text" 
                             name="search" 
-                            placeholder="Search by item code or name..." 
+                            placeholder="Search by item code, name, or serial number..." 
                             value="<?php echo htmlspecialchars($searchItem); ?>"
                         >
                         <button type="submit"><i class="fas fa-search"></i> Search</button>
