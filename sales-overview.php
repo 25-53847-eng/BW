@@ -49,19 +49,19 @@ $combined_filter = $dataset_filter . $year_filter;
 
 $allMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// Units SOLD to companies (records with company_name) - ONLY 1A, 2A, 4A units
+// Units SOLD to companies (records with company_name)
 $unitsSold = 0;
-$r = $conn->query("SELECT COALESCE(SUM(quantity),0) as t FROM delivery_records WHERE company_name IS NOT NULL AND company_name != '' AND unit_type IN ('1a', '2a', '4a')$combined_filter");
+$r = $conn->query("SELECT COALESCE(SUM(quantity),0) as t FROM delivery_records WHERE company_name IS NOT NULL AND company_name != ''$combined_filter");
 if ($r && $row = $r->fetch_assoc()) $unitsSold = intval($row['t']);
 
-// Total deliveries (all records) - ONLY 1A, 2A, 4A units
+// Total deliveries (all records)
 $totalDeliveries = 0;
-$r = $conn->query("SELECT COUNT(*) as t FROM delivery_records WHERE 1=1 AND unit_type IN ('1a', '2a', '4a')$combined_filter");
+$r = $conn->query("SELECT COUNT(*) as t FROM delivery_records WHERE 1=1$combined_filter");
 if ($r && $row = $r->fetch_assoc()) $totalDeliveries = intval($row['t']);
 
-// Monthly sales data (ONLY 1A, 2A, 4A units)
+// Monthly sales data
 $monthly_sales = array_fill_keys($allMonths, 0);
-$r = $conn->query("SELECT delivery_month, COALESCE(SUM(quantity),0) AS total FROM delivery_records WHERE delivery_month IS NOT NULL AND delivery_month != '' AND unit_type IN ('1a', '2a', '4a')$combined_filter GROUP BY delivery_month");
+$r = $conn->query("SELECT delivery_month, COALESCE(SUM(quantity),0) AS total FROM delivery_records WHERE delivery_month IS NOT NULL AND delivery_month != ''$combined_filter GROUP BY delivery_month");
 if ($r) {
     while ($row = $r->fetch_assoc()) {
         if (array_key_exists($row['delivery_month'], $monthly_sales))
@@ -69,9 +69,9 @@ if ($r) {
     }
 }
 
-// Top products (ONLY 1A, 2A, 4A units)
+// Top products
 $top_products = [];
-$r = $conn->query("SELECT item_name, item_code, SUM(quantity) as total_qty FROM delivery_records WHERE item_name IS NOT NULL AND item_name != '' AND unit_type IN ('1a', '2a', '4a')$combined_filter GROUP BY item_name ORDER BY total_qty DESC LIMIT 5");
+$r = $conn->query("SELECT item_name, item_code, SUM(quantity) as total_qty FROM delivery_records WHERE item_name IS NOT NULL AND item_name != ''$combined_filter GROUP BY item_name ORDER BY total_qty DESC LIMIT 5");
 if ($r) {
     while ($row = $r->fetch_assoc()) $top_products[] = $row;
 }

@@ -18,6 +18,7 @@ $menuItems = [
     ['label' => 'Analytics', 'href' => 'analytics.php', 'icon' => 'fas fa-chart-bar', 'pages' => ['analytics.php']],
     ['label' => 'Reports', 'href' => 'reports.php', 'icon' => 'fas fa-file-alt', 'pages' => ['reports.php']],
     ['label' => 'Warranty Items', 'href' => 'warranty-replacements.php', 'icon' => 'fas fa-wrench', 'pages' => ['warranty-replacements.php']],
+    ['label' => 'System Tutorial', 'href' => 'system-tutorial.php', 'icon' => 'fas fa-book', 'pages' => ['system-tutorial.php']],
     ['label' => 'Settings', 'href' => 'settings.php', 'icon' => 'fas fa-cog', 'pages' => ['settings.php', 'profile.php', 'help.php']],
 ];
 

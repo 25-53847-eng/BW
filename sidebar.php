@@ -24,6 +24,7 @@ $menuItems = [
     ['label' => 'Warranty Items', 'href' => 'warranty-replacements.php', 'icon' => 'fas fa-wrench', 'pages' => ['warranty-replacements.php'], 'roles' => ['admin', 'employee']],
     ['label' => 'Select Access', 'href' => 'access.php', 'icon' => 'fas fa-user-shield', 'pages' => ['access.php'], 'roles' => ['admin']],
     ['label' => 'Manage Employees', 'href' => 'manage-employees.php', 'icon' => 'fas fa-users', 'pages' => ['manage-employees.php'], 'roles' => ['admin']],
+    ['label' => 'System Tutorial', 'href' => 'system-tutorial.php', 'icon' => 'fas fa-book', 'pages' => ['system-tutorial.php'], 'roles' => ['admin', 'employee']],
     ['label' => 'Settings', 'href' => 'settings.php', 'icon' => 'fas fa-cog', 'pages' => ['settings.php', 'profile.php', 'help.php'], 'roles' => ['admin', 'employee']],
 ];
 
