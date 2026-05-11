@@ -43,6 +43,16 @@ if ($selected_dataset === '') {
     $selected_dataset = null;
 }
 
+// Get selected year from GET parameter or session
+if (isset($_GET['year'])) {
+    $selected_year = intval($_GET['year']);
+    if ($selected_year > 1900 && $selected_year < 2100) {
+        $_SESSION['active_year'] = $selected_year;
+    }
+} else {
+    $selected_year = isset($_SESSION['active_year']) ? $_SESSION['active_year'] : null;
+}
+
 // Build dataset filter for queries
 // Admins see all data; exclude inventory uploads
 $dataset_filter = ' AND company_name != ?';
@@ -50,6 +60,10 @@ $dataset_filter_params = ['Stock Addition'];
 if (!empty($selected_dataset)) {
     $dataset_filter .= ' AND dataset_name = ?';
     $dataset_filter_params[] = $selected_dataset;
+}
+if (!empty($selected_year)) {
+    $dataset_filter .= ' AND YEAR(delivery_date) = ?';
+    $dataset_filter_params[] = $selected_year;
 }
 
 // Users table is created by db_config.php (MySQL) or the SQLite bootstrap.
@@ -656,6 +670,34 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
             <div class="industrial-pattern"></div>
         </div>
 
+        <!-- FILTER SECTION -->
+        <div style="background: linear-gradient(135deg, #1e2a38 0%, #2a3f5f 100%); border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 20px; margin-bottom: 28px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+                <label style="font-size: 14px; font-weight: 600; color: #e0e0e0; margin: 0; white-space: nowrap;">
+                    <i class="fas fa-calendar" style="color: #f4d03f; margin-right: 8px;"></i>Filter by Year:
+                </label>
+                <select id="yearFilterMain" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #4a5f7a; background: #1e2a38; font-size: 13px; font-weight: 500; cursor: pointer; color: #e0e0e0; transition: border-color 0.2s;" onchange="filterByYear(this.value)">
+                    <option value="">All Years</option>
+                    <?php
+                    // Get available years from database
+                    $yearResult = $conn->query("SELECT DISTINCT YEAR(delivery_date) as year FROM delivery_records WHERE delivery_date IS NOT NULL AND company_name != 'Stock Addition' ORDER BY year DESC");
+                    if ($yearResult) {
+                        while ($yearRow = $yearResult->fetch_assoc()) {
+                            $year = intval($yearRow['year']);
+                            $selected = ($selected_year === $year) ? 'selected' : '';
+                            echo "<option value=\"{$year}\" {$selected}>{$year}</option>";
+                        }
+                    }
+                    ?>
+                </select>
+            </div>
+            <?php if (!empty($selected_year)): ?>
+            <button style="padding: 8px 16px; border-radius: 6px; border: 1px solid #f4d03f; background: transparent; color: #f4d03f; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="filterByYear('')">
+                <i class="fas fa-times" style="margin-right: 6px;"></i>Clear Filter
+            </button>
+            <?php endif; ?>
+        </div>
+
         <!-- KPI METRICS SECTION -->
         <section class="kpi-metrics">
             <!-- Total Orders -->
@@ -1103,6 +1145,17 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
         // Navigation function
         function goToReports() {
             window.location.href = 'reports.php';
+        }
+
+        // Filter by year function
+        function filterByYear(year) {
+            const params = new URLSearchParams(window.location.search);
+            if (year) {
+                params.set('year', year);
+            } else {
+                params.delete('year');
+            }
+            window.location.search = params.toString();
         }
 
         function closeAllMetricInsights() {
