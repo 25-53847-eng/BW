@@ -112,6 +112,19 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
             flex-wrap: wrap;
             gap: clamp(12px, 1.5vw, 20px);
         }
+        .year-filter-bar {
+            background: linear-gradient(135deg, #1a2a3a 0%, #253448 100%);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.1);
+            padding: clamp(14px, 2vw, 22px) clamp(16px, 2.5vw, 28px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: clamp(20px, 2.5vw, 30px);
+            flex-wrap: wrap;
+            gap: clamp(12px, 2vw, 20px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
         .page-title {
             font-size: clamp(20px, 2.5vw, 28px);
             font-weight: 700;
@@ -308,6 +321,38 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
         body.light-mode .table-header h3 i { color: #1e88e5; }
         html.light-mode .summary-card .icon,
         body.light-mode .summary-card .icon { color: #1e88e5; }
+        html.light-mode .year-filter-bar,
+        body.light-mode .year-filter-bar {
+            background: linear-gradient(135deg, #2c3e50 0%, #1f2d3d 100%);
+            border: 1.5px solid rgba(255,255,255,0.15);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        html.light-mode .year-filter-bar label,
+        body.light-mode .year-filter-bar label { 
+            color: #e8eef8; 
+            font-weight: 700;
+        }
+        html.light-mode .year-filter-bar select,
+        body.light-mode .year-filter-bar select {
+            background: #1a2a3a;
+            color: #e8eef8;
+            border: 1.5px solid #4a6fa5;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        html.light-mode .year-filter-bar select option,
+        body.light-mode .year-filter-bar select option {
+            background: #1a2a3a;
+            color: #e8eef8;
+        }
+        html.light-mode .year-filter-bar i,
+        body.light-mode .year-filter-bar i { color: #f4d03f; }
+        html.light-mode .page-header,
+        body.light-mode .page-header {
+            background: transparent;
+            border-left: none;
+        }
+        html.light-mode .page-header label,
+        body.light-mode .page-header label { color: #1a3a5c; }
     </style>
 </head>
 <body>
@@ -349,7 +394,21 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
     <!-- MAIN CONTENT -->
     <main class="main-content" id="mainContent">
 
-        <div class="page-header">
+        <div class="year-filter-bar">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <label for="pageYearFilter" style="color:#e8eef8;font-size:14px;font-weight:600;white-space:nowrap;"><i class="fas fa-filter" style="margin-right:8px;color:#f4d03f;"></i>Filter by Year:</label>
+                <select id="pageYearFilter" style="background:#1a2a3a;color:#e8eef8;border:1.5px solid #4a6fa5;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;outline:none;min-width:90px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+                    <?php foreach ($available_years as $y): ?>
+                    <option value="<?php echo $y; ?>" <?php echo $selected_year === $y ? 'selected' : ''; ?> style="background:#1a2a3a;color:#e8eef8;"><?php echo $y; ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <button id="clearYearFilter" style="background:transparent;color:#f4d03f;border:1.5px solid #f4d03f;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;outline:none;transition:all 0.3s ease;display:flex;align-items:center;gap:6px;white-space:nowrap;" onmouseover="this.style.background='rgba(244,208,63,0.1)'" onmouseout="this.style.background='transparent'">
+                <i class="fas fa-times"></i> Clear Filter
+            </button>
+        </div>
+
+        <div class="page-header" style="margin-top:20px;">
             <h1 class="page-title">
                 <i class="fas fa-chart-pie"></i>
                 Sales Overview
@@ -463,11 +522,37 @@ $topQtys     = json_encode(array_column($top_products, 'total_qty'));
 
         let monthlyChart = null;
 
-        // Handle monthly chart year filter change
+        // Handle page-level year filter change
         document.addEventListener('DOMContentLoaded', function() {
-            const yearFilter = document.getElementById('monthlyChartYearFilter');
-            if (yearFilter) {
-                yearFilter.addEventListener('change', function() {
+            const pageYearFilter = document.getElementById('pageYearFilter');
+            const clearBtn = document.getElementById('clearYearFilter');
+            
+            if (pageYearFilter) {
+                pageYearFilter.addEventListener('change', function() {
+                    const selectedYear = this.value;
+                    const dataset = new URLSearchParams(window.location.search).get('dataset') || '';
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('year', selectedYear);
+                    if (dataset) params.set('dataset', dataset);
+                    window.location.href = window.location.pathname + '?' + params.toString();
+                });
+            }
+            
+            if (clearBtn) {
+                clearBtn.addEventListener('click', function() {
+                    const params = new URLSearchParams(window.location.search);
+                    params.delete('year');
+                    const newUrl = params.toString() 
+                        ? window.location.pathname + '?' + params.toString()
+                        : window.location.pathname;
+                    window.location.href = newUrl;
+                });
+            }
+
+            // Handle monthly chart year filter change
+            const monthlyYearFilter = document.getElementById('monthlyChartYearFilter');
+            if (monthlyYearFilter) {
+                monthlyYearFilter.addEventListener('change', function() {
                     const selectedYear = this.value;
                     const dataset = new URLSearchParams(window.location.search).get('dataset') || '';
                     
