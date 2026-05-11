@@ -140,8 +140,21 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Count unique client companies (using shared helper for consistency)
-$stats['total_companies'] = countClientCompanies($conn, $dataset_filter, $dataset_filter_params);
+// Count unique client companies - include ALL except internal markers and corrupted entries
+// Exclude: Stock Addition, Orders, Delivery Records (internal markers)
+// Also exclude: to Andison Manila (incomplete), Zamora display (duplicate variant)
+$sql = "SELECT COUNT(DISTINCT company_name) as total FROM delivery_records 
+        WHERE company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'to Andison Manila', 'Zamora display') 
+        AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    bindParamsAndExecute($stmt, $dataset_filter_params);
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $stats['total_companies'] = intval($row['total']);
+    }
+    $stmt->close();
+}
 
 // Count unique item codes (models)
 $sql = "SELECT COUNT(DISTINCT item_code) as total FROM delivery_records WHERE 1=1" . $dataset_filter;

@@ -76,8 +76,8 @@ function bindParamsAndExecute(&$stmt, $params) {
     $stmt->execute();
 }
 
-// Count total delivered (ONLY 1A, 2A, 4A units)
-$sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE status = 'Delivered' AND unit_type IN ('1a', '2a', '4a')" . $dataset_filter;
+// Count total delivered (all units - unit_type column may be empty)
+$sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE status = 'Delivered'" . $dataset_filter;
 $stmt = $conn->prepare($sql);
 if ($stmt) {
     bindParamsAndExecute($stmt, $dataset_filter_params);
@@ -117,11 +117,24 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Count unique client companies (using shared helper for consistency)
-$stats['total_companies'] = countClientCompanies($conn, $dataset_filter, $dataset_filter_params);
+// Count unique client companies - include ALL except internal markers and corrupted entries
+// Exclude: Stock Addition, Orders, Delivery Records (internal markers)
+// Also exclude: to Andison Manila (incomplete), Zamora display (duplicate variant)
+$sql = "SELECT COUNT(DISTINCT company_name) as total FROM delivery_records 
+        WHERE company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'to Andison Manila', 'Zamora display') 
+        AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
+$stmt = $conn->prepare($sql);
+if ($stmt) {
+    bindParamsAndExecute($stmt, $dataset_filter_params);
+    $result = $stmt->get_result();
+    if ($row = $result->fetch_assoc()) {
+        $stats['total_companies'] = intval($row['total']);
+    }
+    $stmt->close();
+}
 
-// Count unique item codes (models)
-$sql = "SELECT COUNT(DISTINCT item_code) as total FROM delivery_records WHERE 1=1" . $dataset_filter;
+// Count unique item codes (models) - exclude UNKNOWN items
+$sql = "SELECT COUNT(DISTINCT item_code) as total FROM delivery_records WHERE item_code NOT LIKE 'UNKNOWN%'" . $dataset_filter;
 $stmt = $conn->prepare($sql);
 if ($stmt) {
     bindParamsAndExecute($stmt, $dataset_filter_params);
@@ -417,10 +430,10 @@ $company_trend_percent = 0;
 $company_trend_direction = 'neutral';
 
 $sql_current = "
-    SELECT COUNT(DISTINCT sold_to) as count
+    SELECT COUNT(DISTINCT company_name) as count
     FROM delivery_records
-    WHERE delivery_month = ? AND sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != ''
-      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter;
+    WHERE delivery_month = ? AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'Andison Manila') 
+      AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
 $stmt = $conn->prepare($sql_current);
 if ($stmt) {
     $params_with_month = array_merge([$current_month_name], $dataset_filter_params);
@@ -435,10 +448,10 @@ if ($stmt) {
 }
 
 $sql_prev = "
-    SELECT COUNT(DISTINCT sold_to) as count
+    SELECT COUNT(DISTINCT company_name) as count
     FROM delivery_records
-    WHERE delivery_month = ? AND sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != ''
-      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter;
+    WHERE delivery_month = ? AND company_name NOT IN ('Stock Addition', 'Orders', 'Delivery Records', 'Andison Manila')
+      AND company_name IS NOT NULL AND company_name != ''" . $dataset_filter;
 $stmt = $conn->prepare($sql_prev);
 if ($stmt) {
     $params_with_month = array_merge([$prev_month_name], $dataset_filter_params);
