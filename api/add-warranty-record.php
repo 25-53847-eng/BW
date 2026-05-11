@@ -74,9 +74,11 @@ if ($warranty_date !== '') {
 }
 
 try {
+    $owner_user_id = intval($_SESSION['user_id'] ?? 0);
+    
     $sql = "INSERT INTO warranty_replacements
-            (item_code, item_name, serial_no, company_name, quantity, uom, status, warranty_date, notes, warranty_flag, red_text_detected, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
+            (item_code, item_name, serial_no, company_name, quantity, uom, status, warranty_date, notes, warranty_flag, red_text_detected, owner_user_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)";
 
     $stmt = $conn->prepare($sql);
     if (!$stmt) {
@@ -84,7 +86,7 @@ try {
     }
 
     $stmt->bind_param(
-        'ssssissssi',
+        'ssssisssssii',
         $item_code,
         $item_name,
         $serial_no,
@@ -94,7 +96,8 @@ try {
         $status,
         $warranty_date_sql,
         $notes,
-        $red_text_detected
+        $red_text_detected,
+        $owner_user_id
     );
 
     if (!$stmt->execute()) {

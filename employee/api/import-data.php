@@ -352,6 +352,7 @@ function ensureWarrantyReplacementsTable($conn, bool $isMysql): void {
             warranty_flag TINYINT(1) DEFAULT 1,
             warranty_date DATE DEFAULT NULL,
             red_text_detected TINYINT(1) DEFAULT 1,
+            owner_user_id INT(11) DEFAULT NULL COMMENT 'User who uploaded/created this warranty record',
             dataset_name VARCHAR(50) DEFAULT NULL,
             highlight_color VARCHAR(20) DEFAULT NULL,
             cell_styles LONGTEXT DEFAULT NULL,
@@ -362,6 +363,7 @@ function ensureWarrantyReplacementsTable($conn, bool $isMysql): void {
             KEY `idx_warranty_date` (`warranty_date`),
             KEY `idx_item_code` (`item_code`),
             KEY `idx_company_name` (`company_name`),
+            KEY `idx_owner_user_id` (`owner_user_id`),
             CONSTRAINT `fk_warranty_delivery_record` FOREIGN KEY (`delivery_record_id`) 
                 REFERENCES `delivery_records` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
@@ -388,6 +390,7 @@ function ensureWarrantyReplacementsTable($conn, bool $isMysql): void {
             warranty_flag INTEGER DEFAULT 1,
             warranty_date DATE DEFAULT NULL,
             red_text_detected INTEGER DEFAULT 1,
+            owner_user_id INTEGER DEFAULT NULL,
             dataset_name VARCHAR(50) DEFAULT NULL,
             highlight_color VARCHAR(20) DEFAULT NULL,
             cell_styles TEXT DEFAULT NULL,
@@ -650,6 +653,26 @@ try {
 
     ensureHighlightMemoryTable($conn, $isMysql);
     ensureWarrantyReplacementsTable($conn, $isMysql);
+
+    // Ensure warranty_replacements table has owner_user_id column (migration for existing tables)
+    if ($isMysql) {
+        $ownerUserIdCol = $conn->query("SHOW COLUMNS FROM warranty_replacements LIKE 'owner_user_id'");
+        if (!$ownerUserIdCol || $ownerUserIdCol->num_rows === 0) {
+            $conn->query("ALTER TABLE warranty_replacements ADD COLUMN owner_user_id INT(11) DEFAULT NULL COMMENT 'User who uploaded/created this warranty record'");
+            $conn->query("CREATE INDEX idx_owner_user_id ON warranty_replacements (owner_user_id)");
+        }
+    } else {
+        $hasOwnerUserId = false;
+        $chkOwnerUserId = $conn->query('PRAGMA table_info(warranty_replacements)');
+        if ($chkOwnerUserId) {
+            while ($r = $chkOwnerUserId->fetch_assoc()) {
+                if (strtolower($r['name']) === 'owner_user_id') { $hasOwnerUserId = true; break; }
+            }
+        }
+        if (!$hasOwnerUserId) {
+            $conn->query('ALTER TABLE warranty_replacements ADD COLUMN owner_user_id INTEGER DEFAULT NULL');
+        }
+    }
 
     // Detect all columns from the uploaded data and auto-create missing ones
     $all_columns_in_data = [];
