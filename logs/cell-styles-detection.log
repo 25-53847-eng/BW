@@ -12,3 +12,6 @@
 [08-May-2026 14:32:38 Europe/Berlin] Exception in cell styles detection: Class "IOFactory" not found in C:\xampp\htdocs\BW\api\detect-cell-styles.php:113
 [08-May-2026 15:54:11 Europe/Berlin] Exception in cell styles detection: Class "IOFactory" not found in C:\xampp\htdocs\BW\api\detect-cell-styles.php:113
 [11-May-2026 05:24:12 Europe/Berlin] Exception in cell styles detection: Class "IOFactory" not found in C:\xampp\htdocs\BW\api\detect-cell-styles.php:113
+[11-May-2026 06:13:11 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.1.25.
+[11-May-2026 06:27:24 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.1.25.
+[11-May-2026 06:32:09 Europe/Berlin] Uncaught exception: Composer detected issues in your platform: Your Composer dependencies require a PHP version ">= 8.2.0". You are running 8.1.25.

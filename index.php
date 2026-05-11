@@ -89,6 +89,16 @@ function bindParamsAndExecute(&$stmt, $params) {
     $stmt->execute();
 }
 
+// Gracefully handle older databases where optional columns may not exist yet.
+function hasColumn(mysqli $conn, string $table, string $column): bool {
+    $tableEscaped = $conn->real_escape_string($table);
+    $columnEscaped = $conn->real_escape_string($column);
+    $result = $conn->query("SHOW COLUMNS FROM `{$tableEscaped}` LIKE '{$columnEscaped}'");
+    return $result && $result->num_rows > 0;
+}
+
+$has_inventory_status = hasColumn($conn, 'delivery_records', 'inventory_status');
+
 // Count total delivered (ONLY 1A, 2A, 4A units)
 $sql = "SELECT COALESCE(SUM(quantity), 0) as total FROM delivery_records WHERE status = 'Delivered' AND unit_type IN ('1a', '2a', '4a')" . $dataset_filter;
 $stmt = $conn->prepare($sql);
@@ -156,11 +166,12 @@ $stats['yearly_total'] = $stats['total_delivered'];
 // Get top clients - use sold_to (actual customers), not company_name (internal classification)
 // Exclude inventory items by filtering inventory_status
 $top_clients = [];
+$inventory_filter = $has_inventory_status ? " AND (inventory_status IS NULL OR inventory_status = '')" : '';
 $sql = "
     SELECT sold_to as company_name, COUNT(*) as delivery_count, SUM(quantity) as total_quantity
     FROM delivery_records
     WHERE sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != '' 
-      AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter . "
+            " . $inventory_filter . $dataset_filter . "
     GROUP BY sold_to
     ORDER BY total_quantity DESC
     LIMIT 15

@@ -169,6 +169,19 @@ function inferGroupingFromText($text) {
 
     return '';
 }
+// Detect explicit warranty labels from source columns (e.g., "Warranty Replacement", "Warranty Items").
+function hasWarrantyReplacementLabel(string $text): bool {
+    $value = strtolower(trim($text));
+    if ($value === '') {
+        return false;
+    }
+
+    return strpos($value, 'warranty replacement') !== false
+        || strpos($value, 'warranty replacemer') !== false
+        || strpos($value, 'warranty item') !== false
+        || strpos($value, 'warranty items') !== false
+        || preg_match('/\bwarranty\b/', $value) === 1;
+}
 
 function inferGroupingFromColor($hexColor) {
     $hex = strtoupper(trim((string) $hexColor));
@@ -573,6 +586,15 @@ $column_mappings = [
     'category' => 'groupings',
     'Grouping' => 'groupings',
     'Group' => 'groupings',
+    'Warranty Replacement' => 'groupings',
+    'WARRANTY REPLACEMENT' => 'groupings',
+    'warranty replacement' => 'groupings',
+    'Warranty Items' => 'groupings',
+    'WARRANTY ITEMS' => 'groupings',
+    'warranty items' => 'groupings',
+    'Warranty Item' => 'groupings',
+    'WARRANTY ITEM' => 'groupings',
+    'warranty item' => 'groupings',
     'By Color' => 'groupings',
     'BY COLOR' => 'groupings',
     'by color' => 'groupings',
@@ -1078,7 +1100,18 @@ try {
             // Don't auto-fill quantity - if Excel has no quantity, leave it as 0/empty
 
             // Check if this row is marked as warranty (red text detected)
-            $is_warranty_row = isset($warranty_rows_flipped[$index]);
+            // Check if this row is marked as warranty by red text OR explicit warranty labels.
+            $is_warranty_by_red = isset($warranty_rows_flipped[$index]);
+            $warrantyIndicatorText = implode(' ', [
+                $groupings,
+                $status,
+                $notes,
+                $sold_to,
+                $item_name,
+            ]);
+            $is_warranty_by_label = hasWarrantyReplacementLabel($warrantyIndicatorText);
+            $is_warranty_row = $is_warranty_by_red || $is_warranty_by_label;
+            $red_text_detected = $is_warranty_by_red ? 1 : 0;
             
             if (!$is_warranty_row) {
                 // SKIP warranty rows from delivery_records - they go directly to warranty_replacements
