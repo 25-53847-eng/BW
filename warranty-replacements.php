@@ -254,23 +254,38 @@ if ($companies_result) {
 
         .filters-group {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 15px;
             margin-bottom: 15px;
+        }
+        
+        @media (min-width: 1400px) {
+            .filters-group {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+        
+        @media (min-width: 1000px) and (max-width: 1399px) {
+            .filters-group {
+                grid-template-columns: repeat(3, 1fr);
+            }
         }
 
         .filter-input {
             display: flex;
             flex-direction: column;
+            justify-content: flex-end;
         }
 
         .filter-input label {
             color: #8a9ab5;
             font-size: 11px;
             font-weight: 600;
-            margin-bottom: 5px;
+            margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.3px;
+            line-height: 1.2;
+            min-height: 22px;
         }
 
         .filter-input input,
@@ -279,9 +294,11 @@ if ($companies_result) {
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 6px;
             color: #fff;
-            padding: 8px 12px;
+            padding: 10px 12px;
             font-size: 13px;
             font-family: Verdana, sans-serif;
+            height: 38px;
+            box-sizing: border-box;
         }
 
         .filter-input input:focus,
