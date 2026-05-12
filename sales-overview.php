@@ -76,9 +76,9 @@ if ($r) {
     while ($row = $r->fetch_assoc()) $top_products[] = $row;
 }
 
-// Recent deliveries
+// Recent deliveries - exclude Stock Addition (inventory items)
 $recent_sales = [];
-$r = $conn->query("SELECT invoice_no, item_name, quantity, company_name, delivery_date, delivery_month, delivery_day FROM delivery_records WHERE 1=1$combined_filter ORDER BY id DESC LIMIT 10");
+$r = $conn->query("SELECT invoice_no, item_name, quantity, company_name, delivery_date, delivery_month, delivery_day FROM delivery_records WHERE company_name != 'Stock Addition'$combined_filter ORDER BY id DESC LIMIT 10");
 if ($r) {
     while ($row = $r->fetch_assoc()) $recent_sales[] = $row;
 }

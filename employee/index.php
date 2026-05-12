@@ -172,15 +172,16 @@ if ($stats['total_delivered'] > 0) {
 // Calculate yearly total (units only)
 $stats['yearly_total'] = $stats['total_delivered'];
 
-// Get top clients - use sold_to (actual customers), not company_name (internal classification)
-// Exclude inventory items by filtering inventory_status
+// Get top clients - use company_name (actual client companies) for the ranking
+// Exclude inventory items and non-client entries
 $top_clients = [];
 $sql = "
-    SELECT sold_to as company_name, COUNT(*) as delivery_count, SUM(quantity) as total_quantity
+    SELECT company_name, COUNT(*) as delivery_count, SUM(quantity) as total_quantity
     FROM delivery_records
-    WHERE sold_to IS NOT NULL AND sold_to != '' AND TRIM(sold_to) != '' 
+    WHERE company_name IS NOT NULL AND company_name != '' AND company_name != 'Stock Addition'
+      AND company_name NOT REGEXP '^[0-9]+$'
       AND (inventory_status IS NULL OR inventory_status = '')" . $dataset_filter . "
-    GROUP BY sold_to
+    GROUP BY company_name
     ORDER BY total_quantity DESC
     LIMIT 15
 ";
@@ -1093,52 +1094,7 @@ if ($stats['total_delivered'] > 0 && $months_with_data > 0) {
             </div>
         </section>
 
-        <!-- BOTTOM SECTION - TWO CHARTS -->
-        <section class="bottom-section">
-            <!-- Quantity per Model - Group A -->
-            <div class="dashboard-panel">
-                <div class="panel-header">
-                    <h3>Quantity per Model (Group A)</h3>
-                    <button class="panel-menu-btn" aria-label="Panel menu">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                </div>
-                <div class="panel-content">
-                    <div class="chart-expandable" onclick="openChartPreview('groupAChart','Quantity per Model (Group A)')" style="position:relative;">
-                        <canvas id="groupAChart"></canvas>
-                        <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
-                    </div>
-                    <div class="chart-insights">
-                        <div class="insight-header"><i class="fas fa-lightbulb"></i> Insights</div>
-                        <?php foreach($groupA_insights as $insight): ?>
-                        <div class="insight-item"><i class="fas fa-angle-right"></i> <?php echo htmlspecialchars($insight); ?></div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Quantity per Model - Group B -->
-            <div class="dashboard-panel">
-                <div class="panel-header">
-                    <h3>Quantity per Model (Group B)</h3>
-                    <button class="panel-menu-btn" aria-label="Panel menu">
-                        <i class="fas fa-ellipsis-v"></i>
-                    </button>
-                </div>
-                <div class="panel-content">
-                    <div class="chart-expandable" onclick="openChartPreview('groupBChart','Quantity per Model (Group B)')" style="position:relative;">
-                        <canvas id="groupBChart"></canvas>
-                        <span class="chart-expand-hint"><i class="fas fa-expand-alt"></i></span>
-                    </div>
-                    <div class="chart-insights">
-                        <div class="insight-header"><i class="fas fa-lightbulb"></i> Insights</div>
-                        <?php foreach($groupB_insights as $insight): ?>
-                        <div class="insight-item"><i class="fas fa-angle-right"></i> <?php echo htmlspecialchars($insight); ?></div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-        </section>
 
         <!-- FOOTER -->
         <footer class="dashboard-footer">
